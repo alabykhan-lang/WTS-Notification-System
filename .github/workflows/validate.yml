@@ -19,17 +19,21 @@ jobs:
           test -s api.js
           test -s app.js
           test -s bulk.js
+          test -s identity-login.js
           test -s manifest.webmanifest
           test -s vercel.json
           node --check config.js
           node --check api.js
           node --check app.js
           node --check bulk.js
+          node --check identity-login.js
           grep -q 'Notification Management Login' index.html
           grep -q 'class="locked"' index.html
           grep -q 'school_notification_control_read_api' api.js
           grep -q 'school_notification_control_write_api' api.js
           grep -q 'school_notification_bulk_message_api' api.js
           grep -q 'API.bulk' bulk.js
+          grep -q 'school_identity_portal_login' identity-login.js
+          grep -q 'school_identity_change_password' identity-login.js
           if grep -q 'public-live.js' index.html; then echo 'Public live loader must not be used'; exit 1; fi
           if grep -RIn -E 'SUPABASE_SERVICE_ROLE_KEY|service_role_key|sb_secret_|WTS_WHATSAPP_GATEWAY_TOKEN' . --exclude-dir=.git; then exit 1; fi
