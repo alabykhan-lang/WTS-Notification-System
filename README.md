@@ -3,12 +3,14 @@
 Standalone WhatsApp and SMS notification management for Way to Success Standard Schools, Ejigbo.
 
 Production release includes:
-- parent and guardian contact records;
-- explicit WhatsApp consent handling;
+- parent, guardian and staff recipient records;
+- explicit WhatsApp consent and number verification;
+- pilot-recipient controls;
 - automatic attendance alert drafts;
 - bulk WhatsApp and SMS messaging;
+- academic result, performance, fees, emergency and general messages;
 - English, Yoruba and bilingual templates;
 - delivery status and audit tracking;
 - shared WTS Supabase database.
 
-Release refreshed for the dedicated Vercel project on 12 July 2026.
+Dedicated production release refreshed on 12 July 2026.
