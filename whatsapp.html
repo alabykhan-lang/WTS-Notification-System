@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1f3a">
+  <title>WTS WhatsApp Setup</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body{padding:22px}.setup-page{max-width:1100px;margin:auto}.setup-hero{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:24px;border-radius:20px;background:linear-gradient(145deg,#0b1f3a,#17436f);color:#fff}.setup-hero h1{color:#fff;margin:5px 0}.setup-hero p{margin:0;color:#d6e1ee}.setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.setup-card{background:#fff;border:1px solid #dfe6ee;border-radius:16px;padding:19px;box-shadow:0 10px 28px rgba(11,31,58,.06)}.setup-card h2{margin-top:0}.setup-card label{display:grid;gap:6px;margin-bottom:11px;font-size:12px;font-weight:700}.setup-card input,.setup-card textarea{width:100%;padding:11px;border:1px solid #d0d5dd;border-radius:9px}.full{grid-column:1/-1}.status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.status-item{padding:11px;border-radius:10px;background:#f8fafc}.status-item span,.status-item strong{display:block}.status-item span{font-size:9px;color:#667085;text-transform:uppercase}.status-item strong{margin-top:4px}.good{color:#087443}.bad{color:#b42318}.button-row{display:flex;gap:8px;flex-wrap:wrap}.webhook{word-break:break-all;padding:12px;border-radius:10px;background:#eff8ff;color:#175cd3}.warning{padding:12px;border-radius:10px;background:#fffaeb;color:#93370d}.success-note{padding:12px;border-radius:10px;background:#ecfdf3;color:#075f46}.hidden{display:none!important}@media(max-width:760px){body{padding:12px}.setup-hero{align-items:flex-start;flex-direction:column}.setup-grid{grid-template-columns:1fr}.full{grid-column:auto}}
+  </style>
+</head>
+<body>
+<main class="setup-page">
+  <header class="setup-hero">
+    <div><small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1>WhatsApp Delivery Setup</h1><p>Connect the official Meta WhatsApp Cloud API and test one message before live activation.</p></div>
+    <a class="ghost" href="/">Back to Notifications</a>
+  </header>
+
+  <div class="setup-grid">
+    <section class="setup-card">
+      <h2>Administrator login</h2>
+      <label>Administrator code<input id="adminCode" autocomplete="username"></label>
+      <label>Administrator secret<input id="adminSecret" type="password" autocomplete="current-password"></label>
+      <div class="button-row"><button class="primary" id="loadStatus">Connect and load status</button></div>
+    </section>
+
+    <section class="setup-card">
+      <h2>Connection status</h2>
+      <div class="status-grid">
+        <div class="status-item"><span>Access token</span><strong id="tokenStatus">Not checked</strong></div>
+        <div class="status-item"><span>Phone number ID</span><strong id="phoneStatus">Not checked</strong></div>
+        <div class="status-item"><span>Webhook security</span><strong id="webhookStatus">Not checked</strong></div>
+        <div class="status-item"><span>Last Meta test</span><strong id="testStatus">Not tested</strong></div>
+        <div class="status-item"><span>Provider</span><strong id="providerStatus">Disabled</strong></div>
+        <div class="status-item"><span>Live delivery</span><strong id="deliveryStatus">Disabled</strong></div>
+      </div>
+    </section>
+
+    <section class="setup-card full">
+      <h2>Meta Cloud API details</h2>
+      <div class="setup-grid">
+        <label>Phone Number ID<input id="phoneNumberId" placeholder="From WhatsApp API Setup"></label>
+        <label>WhatsApp Business Account ID<input id="businessAccountId" placeholder="WABA ID"></label>
+        <label>Graph API version<input id="graphVersion" placeholder="Use the version shown by Meta, for example v23.0"></label>
+        <label>Webhook verify token<div class="button-row"><input id="verifyToken" type="password" placeholder="Create a private verification token"><button class="ghost" id="generateToken" type="button">Generate</button></div></label>
+        <label class="full">Temporary or permanent access token<input id="accessToken" type="password" placeholder="Stored encrypted in Supabase Vault"></label>
+        <label class="full">Meta App Secret<input id="appSecret" type="password" placeholder="Used only to verify webhook signatures"></label>
+      </div>
+      <div class="warning">Saving a blank secret keeps the previously stored value. Saved secrets are encrypted and are never displayed again.</div>
+      <div class="button-row" style="margin-top:12px"><button class="primary" id="saveConfiguration">Save secure configuration</button></div>
+    </section>
+
+    <section class="setup-card">
+      <h2>Webhook configuration</h2>
+      <p>Use this callback URL in Meta’s WhatsApp webhook settings:</p>
+      <div class="webhook" id="webhookUrl">https://wts-notification-system.vercel.app/api/meta-webhook</div>
+      <p>Subscribe to the <strong>messages</strong> webhook field after verification succeeds.</p>
+    </section>
+
+    <section class="setup-card">
+      <h2>Send first real test</h2>
+      <label>Test WhatsApp number<input id="testRecipient" placeholder="080... or 234..."></label>
+      <p>The first test uses Meta’s approved <code>hello_world</code> template.</p>
+      <div class="button-row"><button class="primary" id="sendTest">Send test message</button></div>
+      <div id="testResult" class="success-note hidden"></div>
+    </section>
+
+    <section class="setup-card full">
+      <h2>Live activation</h2>
+      <p>Activate only after the test message reaches the correct WhatsApp number. Automatic attendance drafts will then be eligible for queueing through Meta.</p>
+      <div class="button-row"><button class="primary" id="activateLive">Activate real WhatsApp delivery</button></div>
+    </section>
+  </div>
+</main>
+<div id="toasts"></div>
+<script src="/whatsapp.js"></script>
+</body>
+</html>
