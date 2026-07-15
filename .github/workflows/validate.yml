@@ -20,6 +20,12 @@ jobs:
           test -s app.js
           test -s bulk.js
           test -s identity-login.js
+          test -s whatsapp.html
+          test -s whatsapp.js
+          test -s api/_meta.js
+          test -s api/meta-setup.js
+          test -s api/meta-dispatch.js
+          test -s api/meta-webhook.js
           test -s manifest.webmanifest
           test -s vercel.json
           node --check config.js
@@ -27,13 +33,23 @@ jobs:
           node --check app.js
           node --check bulk.js
           node --check identity-login.js
+          node --check whatsapp.js
+          node --check api/_meta.js
+          node --check api/meta-setup.js
+          node --check api/meta-dispatch.js
+          node --check api/meta-webhook.js
           grep -q 'Notification Management Login' index.html
           grep -q 'class="locked"' index.html
           grep -q 'school_notification_control_read_api' api.js
           grep -q 'school_notification_control_write_api' api.js
           grep -q 'school_notification_bulk_message_api' api.js
           grep -q 'API.bulk' bulk.js
+          grep -q '/api/meta-dispatch' bulk.js
+          grep -q 'WhatsApp Delivery Setup' whatsapp.html
+          grep -q 'school_meta_whatsapp_configure_api' api/meta-setup.js
+          grep -q 'school_meta_whatsapp_claim_api' api/meta-dispatch.js
+          grep -q 'school_meta_whatsapp_webhook_status_secure' api/meta-webhook.js
           grep -q 'school_identity_portal_login' identity-login.js
           grep -q 'school_identity_change_password' identity-login.js
           if grep -q 'public-live.js' index.html; then echo 'Public live loader must not be used'; exit 1; fi
-          if grep -RIn -E 'SUPABASE_SERVICE_ROLE_KEY|service_role_key|sb_secret_|WTS_WHATSAPP_GATEWAY_TOKEN' . --exclude-dir=.git; then exit 1; fi
+          if grep -RIn -E 'SUPABASE_SERVICE_ROLE_KEY|service_role_key|sb_secret_|WTS_WHATSAPP_GATEWAY_TOKEN|EA[A-Za-z0-9]{80,}' . --exclude-dir=.git; then exit 1; fi
