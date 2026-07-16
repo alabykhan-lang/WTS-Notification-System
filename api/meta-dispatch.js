@@ -25,6 +25,10 @@ function templateFor(config, message) {
   };
 }
 
+function workerHeaders(token) {
+  return token ? { "x-wts-worker-secret": token } : {};
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -32,34 +36,54 @@ module.exports = async function handler(req, res) {
   }
 
   const body = readBody(req);
+  const workerToken = String(req.headers["x-wts-worker-secret"] || "").trim();
+  const scheduledWorker = workerToken.length > 0;
   const clientCode = String(body.clientCode || "").trim();
   const clientSecret = String(body.clientSecret || "");
-  const workerId = `meta-${crypto.randomUUID()}`;
+  const workerId = `${scheduledWorker ? "cron" : "meta"}-${crypto.randomUUID()}`;
+  const limit = Math.min(Math.max(Number(body.limit || 25), 1), scheduledWorker ? 25 : 100);
+
+  if (!scheduledWorker && (!clientCode || !clientSecret)) {
+    return sendJson(res, 401, { ok: false, code: "ADMIN_AUTH_REQUIRED" });
+  }
+
+  const headers = workerHeaders(workerToken);
+  const runtimeName = scheduledWorker
+    ? "school_meta_whatsapp_runtime_config_worker"
+    : "school_meta_whatsapp_runtime_config_api";
+  const claimName = scheduledWorker
+    ? "school_meta_whatsapp_claim_worker"
+    : "school_meta_whatsapp_claim_api";
+  const completeName = scheduledWorker
+    ? "school_meta_whatsapp_complete_worker"
+    : "school_meta_whatsapp_complete_api";
 
   try {
-    const config = await rpc("school_meta_whatsapp_runtime_config_api", {
-      p_client_code: clientCode,
-      p_client_secret: clientSecret,
-    });
-    if (!config?.ok) return sendJson(res, 401, config);
+    const config = await rpc(
+      runtimeName,
+      scheduledWorker ? {} : { p_client_code: clientCode, p_client_secret: clientSecret },
+      headers,
+    );
+    if (!config?.ok) return sendJson(res, scheduledWorker ? 403 : 401, config);
 
-    const claim = await rpc("school_meta_whatsapp_claim_api", {
-      p_client_code: clientCode,
-      p_client_secret: clientSecret,
-      p_worker_id: workerId,
-      p_limit: Math.min(Math.max(Number(body.limit || 25), 1), 100),
-    });
-    if (!claim?.ok) return sendJson(res, 409, claim);
+    const claim = await rpc(
+      claimName,
+      scheduledWorker
+        ? { p_worker_id: workerId, p_limit: limit }
+        : {
+            p_client_code: clientCode,
+            p_client_secret: clientSecret,
+            p_worker_id: workerId,
+            p_limit: limit,
+          },
+      headers,
+    );
+    if (!claim?.ok) return sendJson(res, claim?.code === "WORKER_AUTH_FAILED" ? 403 : 409, claim);
 
     const results = [];
     for (const message of claim.messages || []) {
       try {
         const template = templateFor(config, message);
-        if (!template.name) {
-          const error = new Error("APPROVED_WHATSAPP_TEMPLATE_REQUIRED");
-          error.code = "APPROVED_WHATSAPP_TEMPLATE_REQUIRED";
-          throw error;
-        }
         const sent = await sendTemplate(
           config,
           message.destination,
@@ -68,9 +92,7 @@ module.exports = async function handler(req, res) {
           template.parameters,
         );
         const providerReference = sent?.messages?.[0]?.id || null;
-        const completion = await rpc("school_meta_whatsapp_complete_api", {
-          p_client_code: clientCode,
-          p_client_secret: clientSecret,
+        const completionArgs = {
           p_message_id: message.id,
           p_worker_id: workerId,
           p_success: true,
@@ -79,25 +101,37 @@ module.exports = async function handler(req, res) {
           p_error_code: null,
           p_error_message: null,
           p_retry_after_seconds: null,
-        });
+        };
+        const completion = await rpc(
+          completeName,
+          scheduledWorker
+            ? completionArgs
+            : { p_client_code: clientCode, p_client_secret: clientSecret, ...completionArgs },
+          headers,
+        );
         results.push({
           id: message.id,
           status: completion?.status || "sent",
           provider_reference: providerReference,
         });
       } catch (error) {
-        const completion = await rpc("school_meta_whatsapp_complete_api", {
-          p_client_code: clientCode,
-          p_client_secret: clientSecret,
+        const completionArgs = {
           p_message_id: message.id,
           p_worker_id: workerId,
           p_success: false,
           p_provider_reference: null,
-          p_response: {},
+          p_response: error.details ? { provider_error: error.details } : {},
           p_error_code: error.code || "META_DELIVERY_FAILED",
           p_error_message: String(error.message || error),
-          p_retry_after_seconds: null,
-        });
+          p_retry_after_seconds: error.retryAfterSeconds ?? null,
+        };
+        const completion = await rpc(
+          completeName,
+          scheduledWorker
+            ? completionArgs
+            : { p_client_code: clientCode, p_client_secret: clientSecret, ...completionArgs },
+          headers,
+        );
         results.push({
           id: message.id,
           status: completion?.status || "failed",
@@ -109,6 +143,7 @@ module.exports = async function handler(req, res) {
     return sendJson(res, 200, {
       ok: true,
       code: "META_DISPATCH_COMPLETED",
+      mode: scheduledWorker ? "scheduled_worker" : "management",
       claimed: claim.messages?.length || 0,
       results,
     });
