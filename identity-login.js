@@ -71,7 +71,7 @@
   async function beginSso() {
     if (window.__WTS_NOTIFICATION_SSO_PENDING) return;
     window.__WTS_NOTIFICATION_SSO_PENDING = true;
-    $("#authError").textContent = "Opening the existing WTS Workspace session…";
+    $("#authError").textContent = "Opening your School Portal session…";
     const verifier = randomToken();
     const state = randomToken();
     const nonce = randomToken();
