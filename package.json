@@ -6,7 +6,7 @@
   "scripts": {
     "check": "node --check api.js && node --check app.js && node --check bulk.js && node --check identity-login.js && node --check whatsapp.js && node --check api/_meta.js && node --check api/_sso.js && node --check api/meta-dispatch.js && node --check api/meta-setup.js && node --check api/meta-webhook.js && node --check api/sso-start.js && node --check api/sso-token.js",
     "test": "node --test tests/*.test.mjs",
-    "build": "npm run check && npm test"
+    "build": "npm run check && npm test && node tools/build-static.mjs"
   },
   "engines": {
     "node": ">=22"
