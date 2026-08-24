@@ -1,19 +1,19 @@
 "use strict";
 
 (() => {
-  const $ = (s) => document.querySelector(s);
+  const $ = (selector) => document.querySelector(selector);
+
   function toast(message, type = "") {
     const node = document.createElement("div");
     node.className = `toast ${type}`;
     node.textContent = String(message || "Request failed.");
     $("#toasts").appendChild(node);
-    setTimeout(() => node.remove(), 4500);
+    setTimeout(() => node.remove(), 4300);
   }
 
-  function credentials() {
+  function authorization() {
     try {
-      const authorization = window.WTS_NOTIFY_API.getAuth();
-      return { code: authorization.code, secret: authorization.secret };
+      return window.WTS_NOTIFY_API.getAuth();
     } catch {
       window.location.replace("/");
       throw new Error("Staff Portal authorization required.");
@@ -21,159 +21,91 @@
   }
 
   async function call(action, extra = {}) {
-    const { code, secret } = credentials();
-    const response = await fetch("/api/meta-setup", {
+    const auth = authorization();
+    const response = await fetch("/api/bahasha-status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action,
-        clientCode: code,
-        clientSecret: secret,
+        clientCode: auth.code,
+        clientSecret: auth.secret,
         ...extra,
       }),
     });
     const data = await response
       .json()
       .catch(() => ({ ok: false, code: "INVALID_RESPONSE" }));
-    if (!response.ok || data?.ok === false) {
-      throw new Error(
-        data?.message || data?.code || "WhatsApp setup request failed.",
-      );
-    }
+    if (!response.ok || data?.ok === false)
+      throw new Error(data?.message || data?.code || "Bahasha request failed.");
     return data;
   }
 
-  const stateText = (id, good, yes, no) => {
-    const node = $(id);
-    node.textContent = good ? yes : no;
+  function state(node, good, positive, negative) {
+    node.textContent = good ? positive : negative;
     node.className = good ? "good" : "bad";
-  };
-
-  async function loadStatus() {
-    try {
-      const data = await call("status");
-      stateText(
-        "#tokenStatus",
-        data.access_token_configured,
-        "Configured",
-        "Missing",
-      );
-      stateText(
-        "#phoneStatus",
-        Boolean(data.phone_number_id),
-        data.phone_number_id || "Configured",
-        "Missing",
-      );
-      stateText(
-        "#webhookStatus",
-        data.app_secret_configured && data.verify_token_configured,
-        "Configured",
-        "Incomplete",
-      );
-      stateText(
-        "#testStatus",
-        data.last_test_status === "passed",
-        data.last_test_status || "Not tested",
-        data.last_test_status || "Not tested",
-      );
-      stateText(
-        "#providerStatus",
-        data.provider?.status === "active",
-        data.provider?.status || "Disabled",
-        data.provider?.status || "Disabled",
-      );
-      stateText(
-        "#deliveryStatus",
-        data.delivery?.delivery_enabled === true,
-        "Live",
-        "Disabled",
-      );
-      $("#phoneNumberId").value = data.phone_number_id || "";
-      $("#businessAccountId").value = data.business_account_id || "";
-      $("#graphVersion").value = data.graph_version || "";
-      $("#webhookUrl").textContent =
-        data.webhook_url ||
-        "https://wts-notification-system.vercel.app/api/meta-webhook";
-      toast("WhatsApp status loaded.", "success");
-      return data;
-    } catch (error) {
-      toast(error.message, "error");
-      throw error;
-    }
   }
 
-  async function saveConfiguration() {
-    const configuration = {
-      phoneNumberId: $("#phoneNumberId").value.trim(),
-      businessAccountId: $("#businessAccountId").value.trim(),
-      graphVersion: $("#graphVersion").value.trim(),
-      accessToken: $("#accessToken").value.trim(),
-      appSecret: $("#appSecret").value.trim(),
-      verifyToken: $("#verifyToken").value.trim(),
-    };
+  async function loadStatus() {
+    const button = $("#loadStatus");
+    button.disabled = true;
     try {
-      await call("configure", { configuration });
-      $("#accessToken").value = "";
-      $("#appSecret").value = "";
-      $("#verifyToken").value = "";
-      toast("Meta configuration saved securely.", "success");
-      await loadStatus();
+      const data = await call("status");
+      state(
+        $("#apiStatus"),
+        data.connected,
+        data.display_name || "Connected",
+        "Setup required",
+      );
+      state(
+        $("#environmentStatus"),
+        data.environment !== "unconfigured",
+        data.environment || "Unknown",
+        "Unconfigured",
+      );
+      state(
+        $("#templateStatus"),
+        data.approved_template_count > 0,
+        `${data.approved_template_count || 0} approved`,
+        "None approved",
+      );
+      $("#connectionMessage").textContent = data.connected
+        ? `${data.phone_number || "The configured WhatsApp number"} is available through Bahasha${data.quality_rating ? ` with ${data.quality_rating} quality` : ""}.`
+        : "Add BAHASHA_API_KEY and BAHASHA_PHONE_NUMBER_ID in Vercel, then redeploy.";
+      toast(
+        data.connected
+          ? "Bahasha connection is ready."
+          : "Bahasha setup is incomplete.",
+        data.connected ? "success" : "",
+      );
     } catch (error) {
       toast(error.message, "error");
+    } finally {
+      button.disabled = false;
     }
   }
 
   async function sendTest() {
     const recipient = $("#testRecipient").value.trim();
-    if (!recipient)
-      return toast(
-        "Enter the WhatsApp number that should receive the test.",
-        "error",
-      );
+    if (!recipient) return toast("Enter a test parent number.", "error");
+    const button = $("#sendTest");
+    button.disabled = true;
+    button.textContent = "Testing…";
     try {
-      const data = await call("test", {
-        recipient,
-        templateName: "hello_world",
-        language: "en_US",
-      });
-      $("#testResult").classList.remove("hidden");
-      $("#testResult").textContent =
-        `Meta accepted the test for the number ending ${data.recipient_last4}. Check WhatsApp now.`;
-      toast("Real WhatsApp test accepted by Meta.", "success");
-      await loadStatus();
+      const data = await call("test", { recipient });
+      $("#testResult").textContent = data.sandbox
+        ? `Sandbox passed. Simulated message ID: ${data.message_id || "accepted"}. No real message was sent.`
+        : `Bahasha accepted the live test. Message ID: ${data.message_id || "accepted"}.`;
+      toast("Bahasha test accepted.", "success");
     } catch (error) {
+      $("#testResult").textContent = error.message;
       toast(error.message, "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Run sandbox test";
     }
-  }
-
-  async function activateLive() {
-    if (
-      !confirm(
-        "Activate real WhatsApp delivery and automatic queueing? Use this only after the test message arrives successfully.",
-      )
-    )
-      return;
-    try {
-      await call("activate");
-      toast("Real WhatsApp delivery activated.", "success");
-      await loadStatus();
-    } catch (error) {
-      toast(error.message, "error");
-    }
-  }
-
-  function generateToken() {
-    const bytes = new Uint8Array(24);
-    crypto.getRandomValues(bytes);
-    $("#verifyToken").value = Array.from(bytes, (b) =>
-      b.toString(16).padStart(2, "0"),
-    ).join("");
   }
 
   $("#loadStatus").onclick = loadStatus;
-  $("#saveConfiguration").onclick = saveConfiguration;
   $("#sendTest").onclick = sendTest;
-  $("#activateLive").onclick = activateLive;
-  $("#generateToken").onclick = generateToken;
   void loadStatus();
 })();

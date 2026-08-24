@@ -27,7 +27,7 @@ test("the main screen no longer requests administrator credentials", async () =>
   assert.doesNotMatch(html, />\s*Administrator code\s*</i);
   assert.doesNotMatch(html, />\s*Administrator secret\s*</i);
   assert.match(html, /Continue with Staff Portal/);
-  assert.match(html, /authorized Notifications access/);
+  assert.match(html, /Staff Portal session/);
 });
 
 test("the WhatsApp setup reuses the authorized Notifications session", async () => {
@@ -35,9 +35,62 @@ test("the WhatsApp setup reuses the authorized Notifications session", async () 
   const script = await read("whatsapp.js");
   assert.doesNotMatch(html, /Administrator login/i);
   assert.doesNotMatch(html, />\s*Administrator code/i);
-  assert.match(html, /same authorized Notifications session/);
+  assert.match(html, /Connect Bahasha/);
   assert.match(script, /WTS_NOTIFY_API\.getAuth/);
   assert.doesNotMatch(script, /#adminCode|#adminSecret/);
+});
+
+test("the product targets parents and does not offer staff recipients", async () => {
+  const html = await read("index.html");
+  const app = await read("app.js");
+  const bulk = await read("bulk.js");
+  assert.match(html, /Parents only/);
+  assert.doesNotMatch(
+    html,
+    /<option[^>]*value="staff"|Parents and staff|Staff only/,
+  );
+  assert.match(html, /Staff and teachers are not notification\s+recipients/);
+  assert.match(app, /recipientType: "guardian"/);
+  assert.match(bulk, /recipientGroup: "guardian"/);
+  assert.doesNotMatch(bulk, /recipientGroup: \$\(/);
+});
+
+test("Bahasha credentials stay server-side and use the official API", async () => {
+  const helper = await read("api/_bahasha.js");
+  const html = await read("index.html");
+  assert.match(helper, /https:\/\/api\.bahasha\.app/);
+  assert.match(helper, /process\.env\.BAHASHA_API_KEY/);
+  assert.match(helper, /Authorization: `Bearer \$\{current\.apiKey\}`/);
+  assert.doesNotMatch(html, /bh_(?:test|live)_/);
+});
+
+test("Bahasha webhook supports the documented verification challenge", async () => {
+  const previous = process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
+  process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN = "verification-secret";
+  const webhook = require("../api/bahasha-webhook.js");
+  const response = responseRecorder();
+  response.status = function status(code) {
+    this.statusCode = code;
+    return this;
+  };
+  response.send = function send(value = "") {
+    this.body = String(value);
+  };
+  await webhook(
+    {
+      method: "GET",
+      query: {
+        "hub.mode": "subscribe",
+        "hub.verify_token": "verification-secret",
+        "hub.challenge": "challenge-value",
+      },
+    },
+    response,
+  );
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body, "challenge-value");
+  if (previous === undefined) delete process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
+  else process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN = previous;
 });
 
 test("the notification entry point always starts Staff Portal SSO", async () => {

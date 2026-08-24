@@ -6,89 +6,98 @@
       name="viewport"
       content="width=device-width,initial-scale=1,viewport-fit=cover"
     />
-    <meta name="theme-color" content="#0b1f3a" />
-    <title>WTS WhatsApp Setup</title>
+    <meta name="theme-color" content="#071b34" />
+    <title>Connect Bahasha | WTS Notifications</title>
     <link rel="stylesheet" href="/styles.css" />
     <style>
       body {
-        padding: 22px;
+        padding: 24px;
       }
       .setup-page {
-        max-width: 1100px;
+        width: min(980px, 100%);
         margin: auto;
       }
       .setup-hero {
         display: flex;
-        justify-content: space-between;
-        gap: 18px;
         align-items: center;
-        padding: 24px;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 25px;
         border-radius: 20px;
-        background: linear-gradient(145deg, #0b1f3a, #17436f);
+        background: linear-gradient(145deg, #071b34, #174b7e);
         color: #fff;
       }
       .setup-hero h1 {
+        margin: 6px 0;
         color: #fff;
-        margin: 5px 0;
       }
       .setup-hero p {
+        max-width: 650px;
         margin: 0;
-        color: #d6e1ee;
+        color: #d9e4ef;
       }
       .setup-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 16px;
         margin-top: 16px;
       }
-      .setup-card {
-        background: #fff;
-        border: 1px solid #dfe6ee;
-        border-radius: 16px;
-        padding: 19px;
-        box-shadow: 0 10px 28px rgba(11, 31, 58, 0.06);
+      .setup-grid .wide {
+        grid-column: 1 / -1;
       }
-      .setup-card h2 {
-        margin-top: 0;
-      }
-      .setup-card label {
+      .number {
+        width: 32px;
+        height: 32px;
         display: grid;
-        gap: 6px;
-        margin-bottom: 11px;
-        font-size: 12px;
-        font-weight: 700;
+        place-items: center;
+        border-radius: 50%;
+        background: #e8f7f0;
+        color: #087a58;
+        font-weight: 900;
       }
-      .setup-card input,
-      .setup-card textarea {
-        width: 100%;
-        padding: 11px;
-        border: 1px solid #d0d5dd;
+      .setup-step {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 12px;
+      }
+      .setup-step h2 {
+        margin: 3px 0 8px;
+      }
+      .code-list {
+        display: grid;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .code-list code,
+      .webhook {
+        padding: 10px;
         border-radius: 9px;
-      }
-      .full {
-        grid-column: 1/-1;
+        background: #f3f6fa;
+        color: #12365f;
+        word-break: break-all;
       }
       .status-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 9px;
+        margin: 14px 0;
       }
       .status-item {
-        padding: 11px;
-        border-radius: 10px;
-        background: #f8fafc;
+        padding: 12px;
+        border-radius: 11px;
+        background: #f7f9fc;
       }
       .status-item span,
       .status-item strong {
         display: block;
       }
       .status-item span {
-        font-size: 9px;
-        color: #667085;
+        color: #657084;
+        font-size: 10px;
         text-transform: uppercase;
       }
       .status-item strong {
-        margin-top: 4px;
+        margin-top: 5px;
       }
       .good {
         color: #087443;
@@ -96,46 +105,30 @@
       .bad {
         color: #b42318;
       }
-      .button-row {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
+      .test-row {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) auto;
+        gap: 10px;
+        align-items: end;
       }
-      .webhook {
-        word-break: break-all;
-        padding: 12px;
-        border-radius: 10px;
-        background: #eff8ff;
-        color: #175cd3;
+      .test-row label {
+        margin: 0;
       }
-      .warning {
-        padding: 12px;
-        border-radius: 10px;
-        background: #fffaeb;
-        color: #93370d;
-      }
-      .success-note {
-        padding: 12px;
-        border-radius: 10px;
-        background: #ecfdf3;
-        color: #075f46;
-      }
-      .hidden {
-        display: none !important;
-      }
-      @media (max-width: 760px) {
+      @media (max-width: 720px) {
         body {
           padding: 12px;
         }
-        .setup-hero {
-          align-items: flex-start;
-          flex-direction: column;
-        }
+        .setup-hero,
         .setup-grid {
+          display: grid;
           grid-template-columns: 1fr;
         }
-        .full {
+        .setup-grid .wide {
           grid-column: auto;
+        }
+        .status-grid,
+        .test-row {
+          grid-template-columns: 1fr;
         }
       }
     </style>
@@ -144,160 +137,142 @@
     <main class="setup-page">
       <header class="setup-hero">
         <div>
-          <small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small>
-          <h1>WhatsApp Delivery Setup</h1>
+          <span class="step">OFFICIAL WHATSAPP DELIVERY</span>
+          <h1>Connect Bahasha</h1>
           <p>
-            Connect the official Meta WhatsApp Cloud API and test one message
-            before live activation.
+            Complete this once. Afterward, WTS prepares parent messages and
+            sends approved WhatsApp templates through Bahasha automatically.
           </p>
         </div>
-        <a class="ghost" href="/">Back to Notifications</a>
+        <a class="ghost button-link" href="/">Back to Notifications</a>
       </header>
 
       <div class="setup-grid">
-        <section class="setup-card">
-          <h2>Staff Portal authorization</h2>
-          <p>
-            This setup area uses the same authorized Notifications session as
-            the main workspace. No separate administrator code or secret is
-            needed.
-          </p>
-          <div class="button-row">
-            <button class="primary" id="loadStatus">Refresh status</button>
+        <section class="card wide">
+          <div class="card-heading">
+            <div>
+              <span class="step">CURRENT STATUS</span>
+              <h2>WTS ↔ Bahasha</h2>
+            </div>
+            <button class="primary" id="loadStatus">Check connection</button>
           </div>
-        </section>
-
-        <section class="setup-card">
-          <h2>Connection status</h2>
           <div class="status-grid">
             <div class="status-item">
-              <span>Access token</span>
-              <strong id="tokenStatus">Not checked</strong>
+              <span>API</span><strong id="apiStatus">Not checked</strong>
             </div>
             <div class="status-item">
-              <span>Phone number ID</span>
-              <strong id="phoneStatus">Not checked</strong>
+              <span>Environment</span
+              ><strong id="environmentStatus">Not checked</strong>
             </div>
             <div class="status-item">
-              <span>Webhook security</span>
-              <strong id="webhookStatus">Not checked</strong>
-            </div>
-            <div class="status-item">
-              <span>Last Meta test</span>
-              <strong id="testStatus">Not tested</strong>
-            </div>
-            <div class="status-item">
-              <span>Provider</span>
-              <strong id="providerStatus">Disabled</strong>
-            </div>
-            <div class="status-item">
-              <span>Live delivery</span>
-              <strong id="deliveryStatus">Disabled</strong>
+              <span>Templates</span
+              ><strong id="templateStatus">Not checked</strong>
             </div>
           </div>
-        </section>
-
-        <section class="setup-card full">
-          <h2>Meta Cloud API details</h2>
-          <div class="setup-grid">
-            <label>
-              Phone Number ID
-              <input id="phoneNumberId" placeholder="From WhatsApp API Setup" />
-            </label>
-            <label>
-              WhatsApp Business Account ID
-              <input id="businessAccountId" placeholder="WABA ID" />
-            </label>
-            <label>
-              Graph API version
-              <input
-                id="graphVersion"
-                placeholder="Use the version shown by Meta, for example v23.0"
-              />
-            </label>
-            <label>
-              Webhook verify token
-              <div class="button-row">
-                <input
-                  id="verifyToken"
-                  type="password"
-                  placeholder="Create a private verification token"
-                />
-                <button class="ghost" id="generateToken" type="button">
-                  Generate
-                </button>
-              </div>
-            </label>
-            <label class="full">
-              Temporary or permanent access token
-              <input
-                id="accessToken"
-                type="password"
-                placeholder="Stored encrypted in Supabase Vault"
-              />
-            </label>
-            <label class="full">
-              Meta App Secret
-              <input
-                id="appSecret"
-                type="password"
-                placeholder="Used only to verify webhook signatures"
-              />
-            </label>
-          </div>
-          <div class="warning">
-            Saving a blank secret keeps the previously stored value. Saved
-            secrets are encrypted and are never displayed again.
-          </div>
-          <div class="button-row" style="margin-top: 12px">
-            <button class="primary" id="saveConfiguration">
-              Save secure configuration
-            </button>
-          </div>
-        </section>
-
-        <section class="setup-card">
-          <h2>Webhook configuration</h2>
-          <p>Use this callback URL in Meta’s WhatsApp webhook settings:</p>
-          <div class="webhook" id="webhookUrl">
-            https://wts-notification-system.vercel.app/api/meta-webhook
-          </div>
-          <p>
-            Subscribe to the
-            <strong>messages</strong>
-            webhook field after verification succeeds.
+          <p id="connectionMessage">
+            The API key is kept only in Vercel and is never exposed in this
+            page.
           </p>
         </section>
 
-        <section class="setup-card">
-          <h2>Send first real test</h2>
-          <label>
-            Test WhatsApp number
-            <input id="testRecipient" placeholder="080... or 234..." />
-          </label>
-          <p>
-            The first test uses Meta’s approved
-            <code>hello_world</code>
-            template.
-          </p>
-          <div class="button-row">
-            <button class="primary" id="sendTest">Send test message</button>
+        <section class="card setup-step">
+          <span class="number">1</span>
+          <div>
+            <h2>Create a sandbox key</h2>
+            <p>
+              In Bahasha, open <b>Settings → API Keys → Create key</b> and
+              choose <b>Sandbox</b>. Copy the key when it is shown.
+            </p>
+            <a
+              href="https://www.bahasha.app/alabi-team"
+              target="_blank"
+              rel="noreferrer"
+              >Open Bahasha dashboard</a
+            >
           </div>
-          <div id="testResult" class="success-note hidden"></div>
         </section>
 
-        <section class="setup-card full">
-          <h2>Live activation</h2>
-          <p>
-            Activate only after the test message reaches the correct WhatsApp
-            number. Automatic attendance drafts will then be eligible for
-            queueing through Meta.
-          </p>
-          <div class="button-row">
-            <button class="primary" id="activateLive">
-              Activate real WhatsApp delivery
-            </button>
+        <section class="card setup-step">
+          <span class="number">2</span>
+          <div>
+            <h2>Add two Vercel secrets</h2>
+            <p>
+              In the WTS Notification System project, add these environment
+              variables for Preview first:
+            </p>
+            <div class="code-list">
+              <code>BAHASHA_API_KEY = bh_test_…</code
+              ><code>BAHASHA_PHONE_NUMBER_ID = your connected number ID</code>
+            </div>
+            <p>
+              Redeploy after saving them. Never paste the key into source code.
+            </p>
           </div>
+        </section>
+
+        <section class="card setup-step">
+          <span class="number">3</span>
+          <div>
+            <h2>Approve the school templates</h2>
+            <p>
+              Create these templates in Bahasha so each WTS message type has a
+              predictable route:
+            </p>
+            <div class="code-list">
+              <code>wts_parent_notice</code><code>wts_attendance_notice</code
+              ><code>wts_fee_notice</code><code>wts_result_notice</code
+              ><code>wts_emergency_notice</code>
+            </div>
+            <p>
+              Use named body variables such as <code>parent_name</code>,
+              <code>student_name</code>, and <code>message</code>.
+            </p>
+          </div>
+        </section>
+
+        <section class="card setup-step">
+          <span class="number">4</span>
+          <div>
+            <h2>Register the webhook</h2>
+            <p>Add this URL under Bahasha <b>Settings → Webhooks</b>:</p>
+            <div class="webhook">
+              https://wts-notification-system.vercel.app/api/bahasha-webhook
+            </div>
+            <p>
+              Create a private verification token, save it in Vercel as
+              <code>BAHASHA_WEBHOOK_VERIFY_TOKEN</code>, and enter the same
+              value in Bahasha.
+            </p>
+          </div>
+        </section>
+
+        <section class="card wide">
+          <span class="step">SAFE TEST</span>
+          <h2>Test the connection</h2>
+          <p>
+            A sandbox key returns a realistic success response without sending a
+            message or consuming credits.
+          </p>
+          <div class="test-row">
+            <label
+              >Test parent number<input
+                id="testRecipient"
+                inputmode="tel"
+                placeholder="080… or +234…" /></label
+            ><button class="primary" id="sendTest">Run sandbox test</button>
+          </div>
+          <div class="result" id="testResult">No test run yet.</div>
+        </section>
+
+        <section class="card wide">
+          <span class="step">GO LIVE</span>
+          <h2>Switch only after the sandbox passes</h2>
+          <p>
+            Create a Production key in Bahasha, replace
+            <code>BAHASHA_API_KEY</code> in Vercel, confirm the correct phone
+            number ID and redeploy. WTS will then use the same parent-only
+            workflow for real messages.
+          </p>
         </section>
       </div>
     </main>

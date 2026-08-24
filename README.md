@@ -1,43 +1,52 @@
-# WTS Notification System
+# WTS Parent Notification System
 
-Standalone WhatsApp and SMS notification management for Way to Success Standard Schools, Ejigbo.
+A focused parent communication service for Way to Success Standard Schools, Ejigbo.
+
+## Product boundary
+
+- Recipients are parents/guardians only.
+- Staff use the unified Staff Portal to operate the module, but staff are never offered as message recipients.
+- WhatsApp is the delivery channel.
+- Parent consent and number verification remain mandatory.
+- Message types are general announcements, attendance, fees, results/performance and emergencies.
 
 ## Access
 
-The Notification System uses the unified Staff Portal PKCE handoff. Staff do
-not enter a separate administrator code or secret. The School Portal grants
-access only when the signed-in identity has the active `notifications` module
-grant and the resulting specialist session has `notifications.manage`.
+The module uses the unified Staff Portal PKCE handoff. There is no separate administrator code or secret. The signed-in identity needs the active `notifications` grant and `notifications.manage` permission.
 
-Production capabilities include:
+## Bahasha delivery architecture
 
-- parent and guardian contacts from the Central Registry;
-- explicit WhatsApp consent and number verification;
-- automatic attendance alert drafts;
-- bulk WhatsApp and SMS messaging;
-- English, Yoruba and bilingual templates;
-- message and delivery status tracking;
-- one shared WTS Supabase database.
+1. WTS creates parent-only message records in the shared Supabase database.
+2. `/api/bahasha-dispatch` claims queued records through the existing protected notification worker contract.
+3. The Vercel Function calls `POST https://api.bahasha.app/v1/whatsapp/send` with an approved template.
+4. `/api/bahasha-webhook` accepts Bahasha verification and delivery/reply events.
+5. API keys remain in Vercel environment variables and are never sent to the browser.
 
-## Delivery architecture
+Required Vercel environment variables:
 
-Real WhatsApp delivery uses one controlled path:
+```text
+BAHASHA_API_KEY=bh_test_...          # use a sandbox key first
+BAHASHA_PHONE_NUMBER_ID=...
+BAHASHA_WEBHOOK_VERIFY_TOKEN=...
+BAHASHA_TEMPLATE_MAP={...}           # optional overrides
+```
 
-1. message records and encrypted Meta credentials remain in Supabase;
-2. credentials are read from Supabase Vault only by protected server functions;
-3. the Vercel `/api/meta-dispatch` route claims and sends queued messages;
-4. a Supabase scheduled job calls that route with a private worker token;
-5. Meta webhook updates are recorded through `/api/meta-webhook`.
+Recommended approved template names:
 
-The older Supabase Edge Function is retained only as a compatibility proxy and no longer sends directly through Meta environment variables.
+```text
+wts_parent_notice
+wts_attendance_notice
+wts_fee_notice
+wts_result_notice
+wts_emergency_notice
+```
 
-## Live activation safeguards
+Use `bh_test_*` until template mapping and recipient selection are verified. A sandbox request consumes no credits and sends no real WhatsApp message. Switch to a `bh_live_*` key only after the sandbox flow passes.
 
-Live WhatsApp delivery remains blocked until all of the following are true:
+Webhook URL:
 
-- Meta phone, business account, access token and webhook secrets are configured;
-- a real test message has passed;
-- at least one internal WhatsApp template has been submitted and approved by Meta;
-- at least one pilot parent or staff recipient is opted in and verified.
+```text
+https://wts-notification-system.vercel.app/api/bahasha-webhook
+```
 
-Automatic attendance draft creation remains a separate management setting and is not enabled merely by connecting Meta.
+The older Meta routes remain temporarily as a rollback path while Bahasha is being commissioned; the new interface does not use them.

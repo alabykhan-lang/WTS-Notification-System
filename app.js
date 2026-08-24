@@ -1,269 +1,253 @@
 "use strict";
+
 (() => {
-  const API = window.WTS_NOTIFY_API,
-    $ = (s) => document.querySelector(s),
-    $$ = (s) => [...document.querySelectorAll(s)];
+  const API = window.WTS_NOTIFY_API;
+  const $ = (selector) => document.querySelector(selector);
+  const $$ = (selector) => [...document.querySelectorAll(selector)];
   const state = (window.WTS_NOTIFY_STATE = {
     summary: null,
     contacts: [],
-    templates: [],
     messages: [],
     selected: new Set(),
     connected: false,
   });
-  const esc = (v) =>
-    String(v ?? "").replace(
+
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(
       /[&<>'\"]/g,
-      (c) =>
+      (character) =>
         ({
           "&": "&amp;",
           "<": "&lt;",
           ">": "&gt;",
           "'": "&#39;",
-          '\"': "&quot;",
-        })[c],
+          '"': "&quot;",
+        })[character],
     );
-  function toast(m, t = "") {
-    const n = document.createElement("div");
-    n.className = `toast ${t}`;
-    n.textContent = m;
-    $("#toasts").append(n);
-    setTimeout(() => n.remove(), 4300);
+
+  function toast(message, type = "") {
+    const node = document.createElement("div");
+    node.className = `toast ${type}`;
+    node.textContent = message;
+    $("#toasts").append(node);
+    setTimeout(() => node.remove(), 4300);
   }
+
   window.WTS_NOTIFY_UI = {
     toast,
-    esc,
+    escapeHtml,
     loadSummary,
     loadContacts,
     loadMessages,
   };
-  function keyOf(c) {
-    return `${c.recipient_type}:${c.recipient_id}`;
+
+  function keyOf(contact) {
+    return `guardian:${contact.recipient_id}`;
   }
-  function connected(on, message = "") {
-    state.connected = on;
-    document.body.classList.toggle("locked", !on);
-    $("#dot")?.classList.toggle("on", on);
-    if ($("#connectionText"))
-      $("#connectionText").textContent = on
-        ? "Management connected"
+
+  function setConnected(connected, message = "") {
+    state.connected = connected;
+    document.body.classList.toggle("locked", !connected);
+    $("#dot")?.classList.toggle("on", connected);
+    if ($("#connectionText")) {
+      $("#connectionText").textContent = connected
+        ? "Staff Portal connected"
         : "Staff Portal authorization required";
-    if ($("#login")) $("#login").textContent = "Back to Staff Portal";
+    }
     if ($("#authError")) $("#authError").textContent = message;
   }
-  function signOut() {
+
+  function returnToPortal() {
     API.clearAuth();
     state.contacts = [];
-    state.templates = [];
     state.messages = [];
     state.selected.clear();
-    connected(false);
+    setConnected(false);
     window.location.assign(`${window.WTS_CONFIG.portalOrigin}/workspace`);
   }
-  function view(name) {
+
+  function showView(name) {
     if (!state.connected) return;
-    $$(".view").forEach((v) =>
-      v.classList.toggle("active", v.id === `view-${name}`),
+    $$(".view").forEach((section) =>
+      section.classList.toggle("active", section.id === `view-${name}`),
     );
-    $$(".nav").forEach((b) =>
-      b.classList.toggle("active", b.dataset.view === name),
+    $$(".nav").forEach((button) =>
+      button.classList.toggle("active", button.dataset.view === name),
     );
     $("#title").textContent =
       name === "contacts"
-        ? "Notification Recipients"
-        : name === "compose"
-          ? "Bulk Message"
-          : name === "templates"
-            ? "Templates"
-            : name === "delivery"
-              ? "Delivery Status"
-              : "Notification Dashboard";
-    if (name === "contacts") loadContacts();
-    if (name === "templates") loadTemplates();
-    if (name === "delivery") loadMessages();
+        ? "Parent contacts"
+        : name === "delivery"
+          ? "Message delivery"
+          : "Parent communication";
+    if (name === "contacts") void loadContacts();
+    if (name === "delivery") void loadMessages();
   }
+
   async function loadSummary() {
-    const [d, r] = await Promise.all([
+    const [summary, recipients] = await Promise.all([
       API.read("summary"),
       API.recipientRead("summary"),
     ]);
-    state.summary = d;
-    const guardians = r.guardians || {},
-      staff = r.staff || {};
-    $("#mContacts").textContent = (guardians.total || 0) + (staff.total || 0);
-    $("#mOptin").textContent =
-      (guardians.opted_in || 0) + (staff.opted_in || 0);
-    $("#mPilot").textContent = (guardians.pilot || 0) + (staff.pilot || 0);
-    $("#mDrafts").textContent = d.messages?.draft || 0;
-    $("#mSent").textContent = d.messages?.sent || 0;
-    $("#mFailed").textContent = d.messages?.failed || 0;
-    const c = d.config || {};
-    $("#modeText").textContent = !c.delivery_enabled
-      ? "Delivery is protected and currently disabled."
-      : c.dry_run
-        ? "Safe mock delivery is enabled."
-        : "Live delivery is enabled.";
-    connected(true);
+    state.summary = summary;
+    const parents = recipients.guardians || {};
+    $("#mContacts").textContent = parents.total || 0;
+    $("#mOptin").textContent = parents.opted_in || 0;
+    $("#mDelivered").textContent =
+      summary.messages?.delivered || summary.messages?.sent || 0;
+    $("#mFailed").textContent = summary.messages?.failed || 0;
+    setConnected(true);
   }
+
   async function loadContacts() {
     try {
-      const d = await API.recipientRead("recipients", {
+      const data = await API.recipientRead("recipients", {
         search: $("#contactSearch").value.trim(),
-        recipientType: $("#recipientType").value,
+        recipientType: "guardian",
         status: $("#contactStatus").value,
-        pilotOnly: $("#pilotOnly").checked,
+        pilotOnly: false,
       });
-      state.contacts = d.recipients || [];
+      state.contacts = (data.recipients || []).filter(
+        (contact) => contact.recipient_type !== "staff",
+      );
       $("#contactEmpty").style.display = state.contacts.length
         ? "none"
         : "block";
       $("#contactRows").innerHTML = state.contacts
-        .map((c) => {
-          const key = keyOf(c);
-          return `<tr><td><input type="checkbox" data-contact="${esc(key)}" ${state.selected.has(key) ? "checked" : ""}></td><td><strong>${esc(c.display_name)}</strong><small>${esc(c.recipient_type)}</small></td><td>${esc(c.associated_name || "—")}<small>${esc(c.group_name || "")} ${esc(c.reference_number || "")}</small></td><td>${esc(c.whatsapp_number || "—")}</td><td>${esc(c.sms_number || "—")}</td><td><span class="badge ${esc(c.consent_status)}">${esc(c.consent_status)}</span></td><td>${c.verified ? "Yes" : "No"}</td><td>${c.pilot_enabled ? "Yes" : "No"}</td><td><button class="ghost" data-edit-recipient="${esc(key)}">Edit</button></td></tr>`;
+        .map((contact) => {
+          const key = keyOf(contact);
+          return `<tr>
+          <td><input type="checkbox" data-contact="${escapeHtml(key)}" ${state.selected.has(key) ? "checked" : ""}></td>
+          <td><strong>${escapeHtml(contact.display_name)}</strong></td>
+          <td>${escapeHtml(contact.associated_name || "—")}<small>${escapeHtml(contact.group_name || "")} ${escapeHtml(contact.reference_number || "")}</small></td>
+          <td>${escapeHtml(contact.whatsapp_number || "—")}</td>
+          <td><span class="badge ${escapeHtml(contact.consent_status)}">${escapeHtml(contact.consent_status)}</span></td>
+          <td>${contact.verified ? "Yes" : "No"}</td>
+          <td><button class="ghost compact" data-edit-recipient="${escapeHtml(key)}">Edit</button></td>
+        </tr>`;
         })
         .join("");
-      $$("[data-contact]").forEach(
-        (b) =>
-          (b.onchange = () =>
-            b.checked
-              ? state.selected.add(b.dataset.contact)
-              : state.selected.delete(b.dataset.contact)),
-      );
-      $$("[data-edit-recipient]").forEach(
-        (b) =>
-          (b.onclick = () =>
-            openRecipient(
-              state.contacts.find((c) => keyOf(c) === b.dataset.editRecipient),
-            )),
-      );
-    } catch (e) {
-      toast(e.message, "error");
+
+      $$("[data-contact]").forEach((checkbox) => {
+        checkbox.onchange = () =>
+          checkbox.checked
+            ? state.selected.add(checkbox.dataset.contact)
+            : state.selected.delete(checkbox.dataset.contact);
+      });
+      $$("[data-edit-recipient]").forEach((button) => {
+        button.onclick = () =>
+          openRecipient(
+            state.contacts.find(
+              (contact) => keyOf(contact) === button.dataset.editRecipient,
+            ),
+          );
+      });
+    } catch (error) {
+      toast(error.message, "error");
     }
   }
-  function openRecipient(c) {
-    if (!c) return;
+
+  function openRecipient(contact) {
+    if (!contact) return;
     $("#recipientTitle").textContent =
-      `Edit ${c.recipient_type}: ${c.display_name}`;
-    $("#recipientId").value = c.recipient_id;
-    $("#recipientKind").value = c.recipient_type;
-    $("#recipientPhone").value = c.sms_number || "";
-    $("#recipientWhatsapp").value = c.whatsapp_number || "";
-    $("#recipientConsent").value = c.consent_status || "pending";
+      `Parent contact: ${contact.display_name}`;
+    $("#recipientId").value = contact.recipient_id;
+    $("#recipientWhatsapp").value = contact.whatsapp_number || "";
+    $("#recipientConsent").value = contact.consent_status || "pending";
     $("#recipientConsentSource").value = "";
-    $("#recipientLanguage").value = c.preferred_language || "en";
-    $("#recipientVerified").checked = Boolean(c.verified);
-    $("#recipientPilot").checked = Boolean(c.pilot_enabled);
+    $("#recipientVerified").checked = Boolean(contact.verified);
     $("#recipientDialog").showModal();
   }
-  async function saveRecipient(e) {
-    e.preventDefault();
+
+  async function saveRecipient(event) {
+    event.preventDefault();
     try {
       await API.recipientWrite("saveRecipient", {
         recipientId: $("#recipientId").value,
-        recipientType: $("#recipientKind").value,
-        phone: $("#recipientPhone").value,
+        recipientType: "guardian",
+        phone: $("#recipientWhatsapp").value,
         whatsappNumber: $("#recipientWhatsapp").value,
         consentStatus: $("#recipientConsent").value,
         consentSource: $("#recipientConsentSource").value,
-        preferredLanguage: $("#recipientLanguage").value,
+        preferredLanguage: "en",
         verified: $("#recipientVerified").checked,
-        pilotEnabled: $("#recipientPilot").checked,
+        pilotEnabled: false,
       });
       $("#recipientDialog").close();
-      toast("Recipient saved.", "success");
+      toast("Parent contact saved.", "success");
       await Promise.all([loadContacts(), loadSummary()]);
-    } catch (err) {
-      toast(err.message, "error");
+    } catch (error) {
+      toast(error.message, "error");
     }
   }
-  async function loadTemplates() {
-    try {
-      const d = await API.read("templates");
-      state.templates = d.templates || [];
-      $("#templateList").innerHTML = state.templates.length
-        ? state.templates
-            .map(
-              (t) =>
-                `<article class="template"><div class="message-head"><div><strong>${esc(t.template_name)}</strong><small>${esc(t.source_system)} • ${esc(t.language_code)}</small></div><span class="badge ${esc(t.status)}">${esc(t.status)}</span></div><p>${esc(t.body_template)}</p></article>`,
-            )
-            .join("")
-        : '<div class="empty">No templates found.</div>';
-    } catch (e) {
-      toast(e.message, "error");
-    }
-  }
+
   async function loadMessages() {
     try {
-      const d = await API.read("messages", {
+      const data = await API.read("messages", {
         status: $("#messageStatus").value,
       });
-      state.messages = d.messages || [];
+      state.messages = (data.messages || []).filter(
+        (message) => message.recipient_type !== "staff",
+      );
       $("#messageList").innerHTML = state.messages.length
         ? state.messages
             .map(
-              (m) =>
-                `<article class="message"><div class="message-head"><div><strong>${esc(m.recipient_name || "Recipient")}</strong><small>${esc(m.recipient_type || "")} • ${esc(m.source_system)} • ${esc(m.channel)} • ${esc(m.destination_masked || "")}</small></div><span class="badge ${esc(m.status)}">${esc(m.status)}</span></div><p>${esc(m.message)}</p><small>${new Date(m.created_at).toLocaleString("en-NG")}${m.last_error ? ` • ${esc(m.last_error)}` : ""}</small></article>`,
+              (message) => `<article class="message">
+            <div class="message-head"><div><strong>${escapeHtml(message.recipient_name || "Parent")}</strong><small>${escapeHtml(message.source_system || "WTS")} · WhatsApp · ${escapeHtml(message.destination_masked || "")}</small></div><span class="badge ${escapeHtml(message.status)}">${escapeHtml(message.status)}</span></div>
+            <p>${escapeHtml(message.message)}</p>
+            <small>${new Date(message.created_at).toLocaleString("en-NG")}${message.last_error ? ` · ${escapeHtml(message.last_error)}` : ""}</small>
+          </article>`,
             )
             .join("")
-        : '<div class="empty">No messages found.</div>';
-    } catch (e) {
-      toast(e.message, "error");
+        : '<div class="empty card">No parent messages found.</div>';
+    } catch (error) {
+      toast(error.message, "error");
     }
   }
+
   async function prepareAttendance() {
-    const date = prompt(
+    const attendanceDate = prompt(
       "Attendance date (YYYY-MM-DD)",
       new Date().toISOString().slice(0, 10),
     );
-    if (!date) return;
-    const session = prompt("Academic session", "2026/2027");
-    if (!session) return;
+    if (!attendanceDate) return;
+    const academicSession = prompt("Academic session", "2026/2027");
+    if (!academicSession) return;
     try {
-      const r = await API.write("prepareAttendanceDrafts", {
-        attendanceDate: date,
-        academicSession: session,
+      const result = await API.write("prepareAttendanceDrafts", {
+        attendanceDate,
+        academicSession,
       });
       toast(
-        `${r.draft_operations || 0} attendance alert draft(s) prepared.`,
+        `${result.draft_operations || 0} parent attendance alert(s) prepared.`,
         "success",
       );
       await loadSummary();
-    } catch (e) {
-      toast(e.message, "error");
+    } catch (error) {
+      toast(error.message, "error");
     }
   }
-  async function enableDryRun() {
-    try {
-      await API.write("enableDryRun");
-      toast("Safe mock delivery enabled.", "success");
-      await loadSummary();
-    } catch (e) {
-      toast(e.message, "error");
-    }
-  }
-  $$(".nav").forEach((b) => (b.onclick = () => view(b.dataset.view)));
-  $$("[data-open]").forEach((b) => (b.onclick = () => view(b.dataset.open)));
+
+  $$(".nav").forEach((button) => {
+    button.onclick = () => showView(button.dataset.view);
+  });
   $("#contactFind").onclick = loadContacts;
-  $("#recipientType").onchange = loadContacts;
   $("#contactStatus").onchange = loadContacts;
-  $("#pilotOnly").onchange = loadContacts;
   $("#selectAll").onclick = () => {
-    state.contacts.forEach((c) => state.selected.add(keyOf(c)));
-    loadContacts();
+    state.contacts.forEach((contact) => state.selected.add(keyOf(contact)));
+    void loadContacts();
   };
   $("#recipientForm").onsubmit = saveRecipient;
   $("#prepareAttendance").onclick = prepareAttendance;
-  $("#enableDryRun").onclick = enableDryRun;
   $("#messageStatus").onchange = loadMessages;
   $("#refresh").onclick = () =>
-    loadSummary().catch((e) => {
-      toast(e.message, "error");
-      if (/AUTH|PERMISSION|login/i.test(e.message)) signOut();
+    loadSummary().catch((error) => {
+      toast(error.message, "error");
+      if (/AUTH|PERMISSION|login/i.test(error.message)) returnToPortal();
     });
-  $("#login").onclick = signOut;
-  $("#gateForm").onsubmit = (e) => {
-    e.preventDefault();
+  $("#login").onclick = returnToPortal;
+  $("#gateForm").onsubmit = (event) => {
+    event.preventDefault();
     $("#authError").textContent = "Connecting…";
     if (window.WTS_NOTIFICATION_IDENTITY?.beginSso) {
       void window.WTS_NOTIFICATION_IDENTITY.beginSso();
@@ -271,5 +255,6 @@
     }
     window.location.assign("/api/sso-start");
   };
-  connected(false);
+
+  setConnected(false);
 })();

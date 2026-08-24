@@ -1,122 +1,66 @@
 "use strict";
+
 (() => {
-  const API = window.WTS_NOTIFY_API,
-    UI = window.WTS_NOTIFY_UI,
-    state = window.WTS_NOTIFY_STATE,
-    $ = (s) => document.querySelector(s);
-  function addPurposeControls() {
-    const form = $("#composeForm");
-    if (form && !$("#purpose")) {
-      const label = document.createElement("label");
-      label.innerHTML =
-        'Purpose<select id="purpose"><option value="general_announcement">General announcement</option><option value="academic_result">Academic result</option><option value="academic_performance">Academic performance</option><option value="attendance">Attendance</option><option value="fees">School fees</option><option value="emergency">Emergency notice</option></select>';
-      form.insertBefore(label, $("#message").closest("label"));
-    }
-    const cards = document.querySelector("#view-dashboard .cards");
-    if (cards && !$("#academicMessageCard")) {
-      const card = document.createElement("article");
-      card.className = "card";
-      card.id = "academicMessageCard";
-      card.innerHTML =
-        '<h2>Results and performance</h2><p>Send current-term results, performance summaries or secure report links through WhatsApp or SMS.</p><button class="primary" id="composeResultMessage">Compose academic message</button>';
-      cards.insertBefore(card, cards.lastElementChild);
-      $("#composeResultMessage").onclick = () => {
-        document.querySelector('.nav[data-view="compose"]').click();
-        $("#purpose").value = "academic_result";
-        $("#message").placeholder =
-          "Write the result or performance message recipients should receive";
-        $("#message").focus();
-      };
-    }
-    if (cards && !$("#whatsappSetupCard")) {
-      const card = document.createElement("article");
-      card.className = "card";
-      card.id = "whatsappSetupCard";
-      card.innerHTML =
-        '<h2>Connect real WhatsApp</h2><p>Securely add the official Meta Cloud API details, send a test message and activate live delivery.</p><a class="primary" href="/whatsapp.html">Open WhatsApp setup</a>';
-      cards.appendChild(card);
-    }
-    const protection = [
-      ...document.querySelectorAll("#view-dashboard .card"),
-    ].find((card) =>
-      card.querySelector("h2")?.textContent.includes("Delivery protection"),
-    );
-    if (protection && !$("#dispatchPilot")) {
-      const row = document.createElement("div");
-      row.className = "dialog-actions";
-      row.innerHTML =
-        '<button class="ghost" id="checkWhatsApp">Check WhatsApp connection</button><button class="primary" id="dispatchPilot">Dispatch queued pilot messages</button>';
-      protection.appendChild(row);
-      $("#checkWhatsApp").onclick = checkConnection;
-      $("#dispatchPilot").onclick = dispatchPilot;
-    }
-  }
-  function selectedRecipients() {
+  const API = window.WTS_NOTIFY_API;
+  const UI = window.WTS_NOTIFY_UI;
+  const state = window.WTS_NOTIFY_STATE;
+  const $ = (selector) => document.querySelector(selector);
+
+  function selectedParents() {
     return [...state.selected]
-      .map((value) => {
-        const split = value.indexOf(":");
-        return { type: value.slice(0, split), id: value.slice(split + 1) };
-      })
-      .filter((x) => x.type && x.id);
+      .map((value) => ({
+        type: "guardian",
+        id: value.replace(/^guardian:/, ""),
+      }))
+      .filter((recipient) => recipient.id);
   }
-  async function createBulk(e) {
-    e.preventDefault();
-    const button = e.submitter || $("#composeForm .primary");
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Creating batch…";
-    }
+
+  async function createParentMessage(event) {
+    event.preventDefault();
+    const button = event.submitter || $("#composeForm button[type='submit']");
+    button.disabled = true;
+    button.textContent = "Preparing…";
     try {
-      if (!state.contacts.length) await UI.loadContacts();
-      const audience = $("#audience").value,
-        recipientGroup = $("#recipientGroup").value,
-        channel = $("#channel").value,
-        languageCode = $("#language").value,
-        purpose = $("#purpose")?.value || "general_announcement",
-        message = $("#message").value.trim(),
-        queueNow = $("#queueNow").checked;
-      if (!message) return UI.toast("Enter a message.", "error");
-      const selected = audience === "selected" ? selectedRecipients() : [];
-      if (audience === "selected" && !selected.length)
-        return UI.toast(
-          "Select at least one parent or staff recipient.",
-          "error",
-        );
+      const audience = $("#audience").value;
+      const selected = audience === "selected" ? selectedParents() : [];
+      const message = $("#message").value.trim();
+      if (!message)
+        throw new Error("Write the information parents should receive.");
+      if (audience === "selected" && !selected.length) {
+        throw new Error("Open Parents and select at least one parent first.");
+      }
+
       const result = await API.bulk({
         audience,
-        recipientGroup,
-        channel,
-        languageCode,
-        purpose,
+        recipientGroup: "guardian",
+        channel: "whatsapp",
+        languageCode: "en",
+        purpose: $("#purpose").value,
         message,
-        queueNow,
+        queueNow: $("#queueNow").checked,
         selectedRecipients: selected,
-        contactIds: selected
-          .filter((x) => x.type === "guardian")
-          .map((x) => x.id),
+        contactIds: selected.map((recipient) => recipient.id),
       });
+
       $("#bulkResult").innerHTML =
-        `<strong>Batch created successfully</strong><br>Audience: ${audience.replaceAll("_", " ")}<br>Recipients: ${recipientGroup.replaceAll("_", " ")}<br>Purpose: ${purpose.replaceAll("_", " ")}<br>Messages created: ${result.created || 0}<br>Queued: ${result.queued || 0}<br>Status: ${result.status || "draft"}${result.warning ? `<br><small>${result.warning}</small>` : ""}`;
+        `<strong>Parent message prepared</strong><br>Recipients: ${result.created || 0}<br>Queued for WhatsApp: ${result.queued || 0}<br>Status: ${UI.escapeHtml(result.status || "draft")}${result.warning ? `<br><small>${UI.escapeHtml(result.warning)}</small>` : ""}`;
       UI.toast(
-        `${result.created || 0} message(s) created.`,
+        `${result.created || 0} parent message(s) prepared.`,
         result.created ? "success" : "",
       );
       $("#message").value = "";
       $("#queueNow").checked = false;
       await Promise.all([UI.loadSummary(), UI.loadMessages()]);
-    } catch (err) {
-      UI.toast(err.message, "error");
+    } catch (error) {
+      UI.toast(error.message, "error");
     } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = "Create bulk messages";
-      }
+      button.disabled = false;
+      button.textContent = "Prepare parent message";
     }
   }
-  async function edgeRequest(action) {
-    const auth = API.getAuth(),
-      endpoint =
-        action === "dispatch" ? "/api/meta-dispatch" : "/api/meta-setup";
+
+  async function gatewayRequest(endpoint, action, extra = {}) {
+    const auth = API.getAuth();
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -124,57 +68,77 @@
         action,
         clientCode: auth.code,
         clientSecret: auth.secret,
-        limit: 20,
+        ...extra,
       }),
     });
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error("Invalid WhatsApp gateway response.");
+    const data = await response
+      .json()
+      .catch(() => ({ ok: false, code: "INVALID_RESPONSE" }));
+    if (!response.ok || data?.ok === false) {
+      throw new Error(data?.message || data?.code || "Bahasha request failed.");
     }
-    if (!response.ok || data?.ok === false)
-      throw new Error(
-        data?.message || data?.code || "WhatsApp gateway request failed.",
-      );
     return data;
   }
-  async function checkConnection() {
-    const button = $("#checkWhatsApp");
+
+  function renderProvider(data) {
+    const badge = $("#providerBadge");
+    const text = $("#providerText");
+    if (!badge || !text) return;
+    badge.textContent = data.connected
+      ? data.environment === "sandbox"
+        ? "Sandbox ready"
+        : "Live ready"
+      : "Setup required";
+    badge.classList.toggle("ready", Boolean(data.connected));
+    text.textContent = data.connected
+      ? `${data.display_name || "Bahasha"} is connected with ${data.approved_template_count || 0} approved template(s).`
+      : "Add the Bahasha API key and phone number ID in Vercel to finish the connection.";
+  }
+
+  async function checkBahasha() {
+    const button = $("#checkBahasha");
     button.disabled = true;
     try {
-      const result = await edgeRequest("status");
+      const data = await gatewayRequest("/api/bahasha-status", "status");
+      renderProvider(data);
       UI.toast(
-        `Meta provider: ${result.provider?.status || "disabled"}; last test: ${result.last_test_status || "not tested"}.`,
-        result.provider?.status === "active" ? "success" : "",
+        data.connected
+          ? "Bahasha connection is ready."
+          : "Bahasha setup is not complete.",
+        data.connected ? "success" : "",
       );
-    } catch (err) {
-      UI.toast(err.message, "error");
+    } catch (error) {
+      renderProvider({ connected: false });
+      UI.toast(error.message, "error");
     } finally {
       button.disabled = false;
     }
   }
-  async function dispatchPilot() {
-    if (
-      !confirm(
-        "Dispatch only the queued pilot messages through the active Meta WhatsApp provider?",
-      )
-    )
+
+  async function dispatchQueued() {
+    if (!confirm("Send the queued parent messages through Bahasha now?"))
       return;
-    const button = $("#dispatchPilot");
+    const button = $("#dispatchQueued");
     button.disabled = true;
-    button.textContent = "Dispatching…";
+    button.textContent = "Sending…";
     try {
-      const result = await edgeRequest("dispatch");
-      UI.toast(`Claimed ${result.claimed || 0} queued message(s).`, "success");
+      const result = await gatewayRequest("/api/bahasha-dispatch", "dispatch", {
+        limit: 25,
+      });
+      UI.toast(
+        `${result.claimed || 0} queued parent message(s) processed.`,
+        "success",
+      );
       await Promise.all([UI.loadSummary(), UI.loadMessages()]);
-    } catch (err) {
-      UI.toast(err.message, "error");
+    } catch (error) {
+      UI.toast(error.message, "error");
     } finally {
       button.disabled = false;
-      button.textContent = "Dispatch queued pilot messages";
+      button.textContent = "Send queued messages";
     }
   }
-  addPurposeControls();
-  $("#composeForm").onsubmit = createBulk;
+
+  $("#composeForm").onsubmit = createParentMessage;
+  $("#checkBahasha").onclick = checkBahasha;
+  $("#dispatchQueued").onclick = dispatchQueued;
 })();
