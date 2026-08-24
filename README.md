@@ -2,6 +2,13 @@
 
 Standalone WhatsApp and SMS notification management for Way to Success Standard Schools, Ejigbo.
 
+## Access
+
+The Notification System uses the unified Staff Portal PKCE handoff. Staff do
+not enter a separate administrator code or secret. The School Portal grants
+access only when the signed-in identity has the active `notifications` module
+grant and the resulting specialist session has `notifications.manage`.
+
 Production capabilities include:
 
 - parent and guardian contacts from the Central Registry;

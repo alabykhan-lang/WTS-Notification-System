@@ -2,8 +2,6 @@
 
 (() => {
   const $ = (s) => document.querySelector(s);
-  const SESSION_KEY = "wts_notification_session";
-
   function toast(message, type = "") {
     const node = document.createElement("div");
     node.className = `toast ${type}`;
@@ -13,11 +11,13 @@
   }
 
   function credentials() {
-    const code = $("#adminCode").value.trim();
-    const secret = $("#adminSecret").value;
-    if (!code || !secret) throw new Error("Administrator code and secret are required.");
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code, secret }));
-    return { code, secret };
+    try {
+      const authorization = window.WTS_NOTIFY_API.getAuth();
+      return { code: authorization.code, secret: authorization.secret };
+    } catch {
+      window.location.replace("/");
+      throw new Error("Staff Portal authorization required.");
+    }
   }
 
   async function call(action, extra = {}) {
@@ -32,9 +32,13 @@
         ...extra,
       }),
     });
-    const data = await response.json().catch(() => ({ ok: false, code: "INVALID_RESPONSE" }));
+    const data = await response
+      .json()
+      .catch(() => ({ ok: false, code: "INVALID_RESPONSE" }));
     if (!response.ok || data?.ok === false) {
-      throw new Error(data?.message || data?.code || "WhatsApp setup request failed.");
+      throw new Error(
+        data?.message || data?.code || "WhatsApp setup request failed.",
+      );
     }
     return data;
   }
@@ -48,16 +52,48 @@
   async function loadStatus() {
     try {
       const data = await call("status");
-      stateText("#tokenStatus", data.access_token_configured, "Configured", "Missing");
-      stateText("#phoneStatus", Boolean(data.phone_number_id), data.phone_number_id || "Configured", "Missing");
-      stateText("#webhookStatus", data.app_secret_configured && data.verify_token_configured, "Configured", "Incomplete");
-      stateText("#testStatus", data.last_test_status === "passed", data.last_test_status || "Not tested", data.last_test_status || "Not tested");
-      stateText("#providerStatus", data.provider?.status === "active", data.provider?.status || "Disabled", data.provider?.status || "Disabled");
-      stateText("#deliveryStatus", data.delivery?.delivery_enabled === true, "Live", "Disabled");
+      stateText(
+        "#tokenStatus",
+        data.access_token_configured,
+        "Configured",
+        "Missing",
+      );
+      stateText(
+        "#phoneStatus",
+        Boolean(data.phone_number_id),
+        data.phone_number_id || "Configured",
+        "Missing",
+      );
+      stateText(
+        "#webhookStatus",
+        data.app_secret_configured && data.verify_token_configured,
+        "Configured",
+        "Incomplete",
+      );
+      stateText(
+        "#testStatus",
+        data.last_test_status === "passed",
+        data.last_test_status || "Not tested",
+        data.last_test_status || "Not tested",
+      );
+      stateText(
+        "#providerStatus",
+        data.provider?.status === "active",
+        data.provider?.status || "Disabled",
+        data.provider?.status || "Disabled",
+      );
+      stateText(
+        "#deliveryStatus",
+        data.delivery?.delivery_enabled === true,
+        "Live",
+        "Disabled",
+      );
       $("#phoneNumberId").value = data.phone_number_id || "";
       $("#businessAccountId").value = data.business_account_id || "";
       $("#graphVersion").value = data.graph_version || "";
-      $("#webhookUrl").textContent = data.webhook_url || "https://wts-notification-system.vercel.app/api/meta-webhook";
+      $("#webhookUrl").textContent =
+        data.webhook_url ||
+        "https://wts-notification-system.vercel.app/api/meta-webhook";
       toast("WhatsApp status loaded.", "success");
       return data;
     } catch (error) {
@@ -89,7 +125,11 @@
 
   async function sendTest() {
     const recipient = $("#testRecipient").value.trim();
-    if (!recipient) return toast("Enter the WhatsApp number that should receive the test.", "error");
+    if (!recipient)
+      return toast(
+        "Enter the WhatsApp number that should receive the test.",
+        "error",
+      );
     try {
       const data = await call("test", {
         recipient,
@@ -97,7 +137,8 @@
         language: "en_US",
       });
       $("#testResult").classList.remove("hidden");
-      $("#testResult").textContent = `Meta accepted the test for the number ending ${data.recipient_last4}. Check WhatsApp now.`;
+      $("#testResult").textContent =
+        `Meta accepted the test for the number ending ${data.recipient_last4}. Check WhatsApp now.`;
       toast("Real WhatsApp test accepted by Meta.", "success");
       await loadStatus();
     } catch (error) {
@@ -106,7 +147,12 @@
   }
 
   async function activateLive() {
-    if (!confirm("Activate real WhatsApp delivery and automatic queueing? Use this only after the test message arrives successfully.")) return;
+    if (
+      !confirm(
+        "Activate real WhatsApp delivery and automatic queueing? Use this only after the test message arrives successfully.",
+      )
+    )
+      return;
     try {
       await call("activate");
       toast("Real WhatsApp delivery activated.", "success");
@@ -119,18 +165,15 @@
   function generateToken() {
     const bytes = new Uint8Array(24);
     crypto.getRandomValues(bytes);
-    $("#verifyToken").value = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    $("#verifyToken").value = Array.from(bytes, (b) =>
+      b.toString(16).padStart(2, "0"),
+    ).join("");
   }
-
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
-    if (saved?.code) $("#adminCode").value = saved.code;
-    if (saved?.secret) $("#adminSecret").value = saved.secret;
-  } catch {}
 
   $("#loadStatus").onclick = loadStatus;
   $("#saveConfiguration").onclick = saveConfiguration;
   $("#sendTest").onclick = sendTest;
   $("#activateLive").onclick = activateLive;
   $("#generateToken").onclick = generateToken;
+  void loadStatus();
 })();
