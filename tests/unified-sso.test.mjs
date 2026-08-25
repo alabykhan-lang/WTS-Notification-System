@@ -93,6 +93,41 @@ test("Bahasha webhook supports the documented verification challenge", async () 
   else process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN = previous;
 });
 
+test("Bahasha webhook identifies a missing verification token", async () => {
+  const previousPrimary = process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
+  const previousFallback = process.env.WEBHOOK_VERIFICATION_TOKEN;
+  delete process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
+  delete process.env.WEBHOOK_VERIFICATION_TOKEN;
+  const webhook = require("../api/bahasha-webhook.js");
+  const response = responseRecorder();
+  response.status = function status(code) {
+    this.statusCode = code;
+    return this;
+  };
+  response.send = function send(value = "") {
+    this.body = String(value);
+  };
+  await webhook(
+    {
+      method: "GET",
+      query: {
+        "hub.mode": "subscribe",
+        "hub.verify_token": "any-token",
+        "hub.challenge": "challenge-value",
+      },
+    },
+    response,
+  );
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body, "Webhook verification token is not configured");
+  if (previousPrimary === undefined)
+    delete process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
+  else process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN = previousPrimary;
+  if (previousFallback === undefined)
+    delete process.env.WEBHOOK_VERIFICATION_TOKEN;
+  else process.env.WEBHOOK_VERIFICATION_TOKEN = previousFallback;
+});
+
 test("the notification entry point always starts Staff Portal SSO", async () => {
   const source = await read("identity-login.js");
   assert.match(source, /location\.assign\("\/api\/sso-start"\)/);

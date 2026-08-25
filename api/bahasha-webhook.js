@@ -11,12 +11,18 @@ function safeEqual(left, right) {
 
 module.exports = async function handler(req, res) {
   if (req.method === "GET") {
+    const configuredToken =
+      process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN ||
+      process.env.WEBHOOK_VERIFICATION_TOKEN;
+    if (!configuredToken) {
+      console.error("Bahasha webhook verification token is not configured");
+      return res
+        .status(503)
+        .send("Webhook verification token is not configured");
+    }
     const valid =
       req.query["hub.mode"] === "subscribe" &&
-      safeEqual(
-        req.query["hub.verify_token"],
-        process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN,
-      );
+      safeEqual(req.query["hub.verify_token"], configuredToken);
     if (!valid) return res.status(403).send("Verification failed");
     return res.status(200).send(String(req.query["hub.challenge"] || ""));
   }
