@@ -59,14 +59,46 @@ test("Bahasha credentials stay server-side and use the official API", async () =
   const helper = await read("api/_bahasha.js");
   const html = await read("index.html");
   assert.match(helper, /https:\/\/api\.bahasha\.app/);
+  assert.match(helper, /process\.env\.BAHASHA_API_TOKEN/);
   assert.match(helper, /process\.env\.BAHASHA_API_KEY/);
+  assert.match(helper, /process\.env\.BAHASHA_API_BASE_URL/);
   assert.match(helper, /Authorization: `Bearer \$\{current\.apiKey\}`/);
   assert.doesNotMatch(html, /bh_(?:test|live)_/);
 });
 
+test("Bahasha config uses the token alias and configurable API origin", async () => {
+  const previous = {
+    token: process.env.BAHASHA_API_TOKEN,
+    key: process.env.BAHASHA_API_KEY,
+    phone: process.env.BAHASHA_PHONE_NUMBER_ID,
+    origin: process.env.BAHASHA_API_BASE_URL,
+  };
+  process.env.BAHASHA_API_TOKEN = "bh_test_sandbox";
+  delete process.env.BAHASHA_API_KEY;
+  process.env.BAHASHA_PHONE_NUMBER_ID = "+2348079780804";
+  process.env.BAHASHA_API_BASE_URL = "https://sandbox.example.test/";
+  const helper = require("../api/_bahasha.js");
+  assert.deepEqual(helper.config(), {
+    apiKey: "bh_test_sandbox",
+    phoneNumberId: "+2348079780804",
+    apiOrigin: "https://sandbox.example.test",
+    environment: "sandbox",
+    configured: true,
+    templates: helper.config().templates,
+  });
+  if (previous.token === undefined) delete process.env.BAHASHA_API_TOKEN;
+  else process.env.BAHASHA_API_TOKEN = previous.token;
+  if (previous.key === undefined) delete process.env.BAHASHA_API_KEY;
+  else process.env.BAHASHA_API_KEY = previous.key;
+  if (previous.phone === undefined) delete process.env.BAHASHA_PHONE_NUMBER_ID;
+  else process.env.BAHASHA_PHONE_NUMBER_ID = previous.phone;
+  if (previous.origin === undefined) delete process.env.BAHASHA_API_BASE_URL;
+  else process.env.BAHASHA_API_BASE_URL = previous.origin;
+});
+
 test("Bahasha webhook supports the documented verification challenge", async () => {
-  const previous = process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
-  process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN = "verification-secret";
+  const previous = process.env.BAHASHA_WEBHOOK_VERIFICATION_TOKEN;
+  process.env.BAHASHA_WEBHOOK_VERIFICATION_TOKEN = "verification-secret";
   const webhook = require("../api/bahasha-webhook.js");
   const response = responseRecorder();
   response.status = function status(code) {
@@ -89,13 +121,16 @@ test("Bahasha webhook supports the documented verification challenge", async () 
   );
   assert.equal(response.statusCode, 200);
   assert.equal(response.body, "challenge-value");
-  if (previous === undefined) delete process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
-  else process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN = previous;
+  if (previous === undefined)
+    delete process.env.BAHASHA_WEBHOOK_VERIFICATION_TOKEN;
+  else process.env.BAHASHA_WEBHOOK_VERIFICATION_TOKEN = previous;
 });
 
 test("Bahasha webhook identifies a missing verification token", async () => {
+  const previousConfigured = process.env.BAHASHA_WEBHOOK_VERIFICATION_TOKEN;
   const previousPrimary = process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
   const previousFallback = process.env.WEBHOOK_VERIFICATION_TOKEN;
+  delete process.env.BAHASHA_WEBHOOK_VERIFICATION_TOKEN;
   delete process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
   delete process.env.WEBHOOK_VERIFICATION_TOKEN;
   const webhook = require("../api/bahasha-webhook.js");
@@ -123,6 +158,9 @@ test("Bahasha webhook identifies a missing verification token", async () => {
   if (previousPrimary === undefined)
     delete process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN;
   else process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN = previousPrimary;
+  if (previousConfigured === undefined)
+    delete process.env.BAHASHA_WEBHOOK_VERIFICATION_TOKEN;
+  else process.env.BAHASHA_WEBHOOK_VERIFICATION_TOKEN = previousConfigured;
   if (previousFallback === undefined)
     delete process.env.WEBHOOK_VERIFICATION_TOKEN;
   else process.env.WEBHOOK_VERIFICATION_TOKEN = previousFallback;

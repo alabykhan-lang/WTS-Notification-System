@@ -12,6 +12,7 @@ function safeEqual(left, right) {
 module.exports = async function handler(req, res) {
   if (req.method === "GET") {
     const configuredToken =
+      process.env.BAHASHA_WEBHOOK_VERIFICATION_TOKEN ||
       process.env.BAHASHA_WEBHOOK_VERIFY_TOKEN ||
       process.env.WEBHOOK_VERIFICATION_TOKEN;
     if (!configuredToken) {

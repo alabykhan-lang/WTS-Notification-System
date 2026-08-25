@@ -1,2 +1,4 @@
 public/
 supabase/.temp/
+.vercel
+.env*

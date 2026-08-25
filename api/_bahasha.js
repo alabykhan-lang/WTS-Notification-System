@@ -2,7 +2,7 @@
 
 const { normalizePhone } = require("./_meta");
 
-const API_ORIGIN = "https://api.bahasha.app";
+const DEFAULT_API_ORIGIN = "https://api.bahasha.app";
 const DEFAULT_TEMPLATE_MAP = Object.freeze({
   general_announcement: { name: "wts_parent_notice", language: "en_US" },
   bulk: { name: "wts_parent_notice", language: "en_US" },
@@ -43,13 +43,19 @@ function templateMap() {
 }
 
 function config() {
-  const apiKey = String(process.env.BAHASHA_API_KEY || "").trim();
+  const apiKey = String(
+    process.env.BAHASHA_API_TOKEN || process.env.BAHASHA_API_KEY || "",
+  ).trim();
   const phoneNumberId = String(
     process.env.BAHASHA_PHONE_NUMBER_ID || "",
   ).trim();
+  const apiOrigin = String(
+    process.env.BAHASHA_API_BASE_URL || DEFAULT_API_ORIGIN,
+  ).trim().replace(/\/+$/, "");
   return {
     apiKey,
     phoneNumberId,
+    apiOrigin,
     environment: apiKey.startsWith("bh_test_")
       ? "sandbox"
       : apiKey.startsWith("bh_live_")
@@ -79,7 +85,7 @@ async function request(path, options = {}) {
     error.code = "BAHASHA_CONFIGURATION_REQUIRED";
     throw error;
   }
-  const response = await fetch(`${API_ORIGIN}${path}`, {
+  const response = await fetch(`${current.apiOrigin}${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${current.apiKey}`,
