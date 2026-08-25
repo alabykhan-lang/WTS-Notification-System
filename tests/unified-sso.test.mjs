@@ -166,6 +166,21 @@ test("Bahasha webhook identifies a missing verification token", async () => {
   else process.env.WEBHOOK_VERIFICATION_TOKEN = previousFallback;
 });
 
+test("Bahasha webhook acknowledges POST requests with plain OK", async () => {
+  const webhook = require("../api/bahasha-webhook.js");
+  const response = responseRecorder();
+  response.status = function status(code) {
+    this.statusCode = code;
+    return this;
+  };
+  response.send = function send(value = "") {
+    this.body = String(value);
+  };
+  await webhook({ method: "POST", body: {} }, response);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body, "OK");
+});
+
 test("the notification entry point always starts Staff Portal SSO", async () => {
   const source = await read("identity-login.js");
   assert.match(source, /location\.assign\("\/api\/sso-start"\)/);

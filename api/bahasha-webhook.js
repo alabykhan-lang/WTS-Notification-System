@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
   }
   const body = req.body && typeof req.body === "object" ? req.body : {};
   if (body.object !== "whatsapp_business_account") {
-    return sendJson(res, 200, { ok: true, code: "BAHASHA_WEBHOOK_IGNORED" });
+    return res.status(200).send("OK");
   }
   let statuses = 0;
   let replies = 0;
@@ -67,10 +67,8 @@ module.exports = async function handler(req, res) {
       }
     }
   }
-  return sendJson(res, 200, {
-    ok: true,
-    code: "BAHASHA_WEBHOOK_ACCEPTED",
-    statuses,
-    replies,
-  });
+  console.log(
+    JSON.stringify({ event: "bahasha.webhook.accepted", statuses, replies }),
+  );
+  return res.status(200).send("OK");
 };
