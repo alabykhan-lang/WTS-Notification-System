@@ -59,6 +59,6 @@ jobs:
           grep -q 'WhatsApp Delivery Setup' whatsapp.html
           grep -q 'school_meta_whatsapp_configure_api' api/meta-setup.js
           if grep -q 'public-live.js' index.html; then echo 'Public live loader must not be used'; exit 1; fi
-          if grep -RIn -E 'SUPABASE_SERVICE_ROLE_KEY|service_role_key|sb_secret_|WTS_WHATSAPP_GATEWAY_TOKEN|EA[A-Za-z0-9]{80,}' . --exclude-dir=.git; then exit 1; fi
+          if grep -RIn -E 'SUPABASE_SERVICE_ROLE_KEY|service_role_key|sb_secret_|WTS_WHATSAPP_GATEWAY_TOKEN|EA[A-Za-z0-9]{80,}' . --exclude-dir=.git --exclude='validate.yml'; then exit 1; fi
       - name: Run tests
         run: npm test
