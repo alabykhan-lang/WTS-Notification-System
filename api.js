@@ -24,7 +24,8 @@
   async function rpc(name, action, payload = {}) {
     const authorization = auth();
     const body =
-      name === "school_notification_bulk_message_api"
+      name === "school_notification_bulk_message_api" ||
+      name === "school_notification_template_send_api"
         ? {
             p_client_code: authorization.code,
             p_client_secret: authorization.secret,
@@ -71,8 +72,12 @@
       rpc("school_guardian_import_admin_read_api", action, payload),
     guardianImportWrite: (action, payload = {}) =>
       rpc("school_guardian_import_admin_write_api", action, payload),
+    messageWrite: (action, payload = {}) =>
+      rpc("school_notification_message_admin_write_api", action, payload),
     bulk: (payload) =>
       rpc("school_notification_bulk_message_api", null, payload),
+    templateSend: (payload) =>
+      rpc("school_notification_template_send_api", null, payload),
     getAuth: auth,
     setAuth: (code, secret, expiresAt) =>
       sessionStorage.setItem(

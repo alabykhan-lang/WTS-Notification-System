@@ -175,7 +175,9 @@ function messageValue(message, key) {
     children_summary: children,
     child_count: payload.child_count || (Array.isArray(payload.children) ? payload.children.length : ""),
     class_name: payload.class_name || payload.group_name || "",
-    message: mergedMessage(message),
+    date: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeZone: "Africa/Lagos" }).format(new Date()),
+    time: new Intl.DateTimeFormat("en-NG", { timeStyle: "short", timeZone: "Africa/Lagos" }).format(new Date()),
+    message: payload.template_only ? String(payload.custom_message || "") : mergedMessage(message),
   };
   return values[key] ?? payload[key] ?? "";
 }
@@ -186,13 +188,30 @@ function variablesFor(template, message, purpose) {
   if (!bodyVariables.length) return undefined;
   const orderedKeys = positionalKeys[purpose] || positionalKeys.bulk;
   const body = {};
+  const templateOnly = Boolean(message?.payload?.template_only);
+  const unsupportedTemplateOnlyKeys = new Set([
+    "message",
+    "correction_summary",
+    "secure_link",
+    "term",
+    "late_minutes",
+    "cutoff_time",
+  ]);
   bodyVariables.forEach((variable, index) => {
     const parameterName = String(variable.param_name);
     const sourceKey =
-      typeof variable.param_name === "number"
+      typeof variable.param_name === "number" || /^\d+$/.test(parameterName)
         ? orderedKeys[index]
         : parameterName;
-    body[parameterName] = String(messageValue(message, sourceKey));
+    const value = String(messageValue(message, sourceKey));
+    if (templateOnly && (unsupportedTemplateOnlyKeys.has(sourceKey) || !value)) {
+      const error = new Error(
+        `The selected template needs a value for ${sourceKey}. Use a fixed approved template for direct sending.`,
+      );
+      error.code = "BAHASHA_TEMPLATE_VARIABLE_INPUT_REQUIRED";
+      throw error;
+    }
+    body[parameterName] = value;
   });
   return { body };
 }
@@ -206,7 +225,7 @@ function templateFor(message, templates) {
     message.payload?.whatsapp_template_language || mapping?.language || "en_US";
   const template =
     templates.find(
-      (item) => item.name === name && item.language === language,
+      (item) => item.name === name && (item.language || item.language_code) === language,
     ) || templates.find((item) => item.name === name);
   if (!template || String(template.status || "").toUpperCase() !== "APPROVED") {
     const error = new Error(
@@ -217,7 +236,7 @@ function templateFor(message, templates) {
   }
   return {
     name: template.name,
-    language: template.language,
+    language: template.language || template.language_code || language,
     variables: variablesFor(template, message, purpose),
   };
 }

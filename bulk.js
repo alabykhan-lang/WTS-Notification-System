@@ -8,75 +8,17 @@
 
   function selectedParents() {
     return [...state.selected]
-      .map((groupKey) => state.contacts.find((contact) => (contact.group_key || `guardian:${contact.recipient_id}`) === groupKey))
+      .map((groupKey) => state.contacts.find((contact) => UI.keyOf(contact) === groupKey))
       .filter(Boolean)
       .map((contact) => ({
         type: "guardian_group",
-        id: contact.group_key,
-        memberIds: contact.member_ids || [],
+        id: UI.keyOf(contact),
+        memberIds: Array.isArray(contact.member_ids) ? contact.member_ids : [],
       }));
   }
 
   function selectedContactIds(groups) {
     return groups.flatMap((group) => (Array.isArray(group.memberIds) ? group.memberIds : []));
-  }
-
-  function selectedTemplate() {
-    const value = $("#templateSelect")?.value || "";
-    if (!value) return {};
-    const separator = value.indexOf("::");
-    if (separator < 0) return {};
-    try {
-      return {
-        whatsappTemplateName: decodeURIComponent(value.slice(0, separator)),
-        whatsappTemplateLanguage: decodeURIComponent(value.slice(separator + 2)),
-      };
-    } catch {
-      return {};
-    }
-  }
-
-  async function createParentMessage(event) {
-    event.preventDefault();
-    const button = event.submitter || $("#composeForm button[type='submit']");
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Preparing…";
-    }
-    try {
-      const audience = $("#audience").value;
-      const selected = audience === "selected" ? selectedParents() : [];
-      const message = $("#message").value.trim();
-      if (!message) throw new Error("Write the information parents should receive.");
-      if (audience === "selected" && !selected.length) throw new Error("Open Parents, select ready groups, then return here.");
-
-      const result = await API.bulk({
-        audience,
-        recipientGroup: "guardian",
-        channel: "whatsapp",
-        languageCode: "en",
-        purpose: $("#purpose").value,
-        classKey: $("#composeClass").value,
-        message,
-        queueNow: $("#queueNow").checked,
-        selectedRecipients: selected,
-        contactIds: selectedContactIds(selected),
-        ...selectedTemplate(),
-      });
-
-      const parentGroups = result.parent_groups ?? result.created ?? 0;
-      $("#bulkResult").innerHTML = `<strong>Parent message batch prepared</strong><br>Parent groups: ${UI.escapeHtml(parentGroups)}<br>WhatsApp messages created: ${UI.escapeHtml(result.created || 0)}<br>Queued for delivery: ${UI.escapeHtml(result.queued || 0)}<br>Scope: ${UI.escapeHtml($("#composeClass").selectedOptions[0]?.textContent || "All active classes")}<br>Status: ${UI.escapeHtml(result.status || "draft")}${result.warning ? `<br><small>${UI.escapeHtml(result.warning)}</small>` : ""}`;
-      UI.toast(`${parentGroups} parent group message(s) prepared.`, parentGroups ? "success" : "");
-      $("#queueNow").checked = false;
-      await Promise.all([UI.loadSummary(), UI.loadMessages()]);
-    } catch (error) {
-      UI.toast(error.message, "error");
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = "Prepare parent messages";
-      }
-    }
   }
 
   async function gatewayRequest(endpoint, action, extra = {}) {
@@ -87,7 +29,11 @@
       body: JSON.stringify({ action, clientCode: auth.code, clientSecret: auth.secret, ...extra }),
     });
     const data = await response.json().catch(() => ({ ok: false, code: "INVALID_RESPONSE" }));
-    if (!response.ok || data?.ok === false) throw new Error(data?.message || data?.code || "Bahasha request failed.");
+    if (!response.ok || data?.ok === false) {
+      const error = new Error(data?.message || data?.code || "Bahasha request failed.");
+      error.code = data?.code || "BAHASHA_REQUEST_FAILED";
+      throw error;
+    }
     return data;
   }
 
@@ -95,15 +41,30 @@
     UI.setProviderData(data);
     const badge = $("#providerBadge");
     const text = $("#providerText");
-    if (!badge || !text) return;
-    badge.textContent = data.connected
-      ? data.environment === "sandbox" ? "Sandbox ready" : "Live ready"
-      : "Setup required";
-    badge.classList.toggle("ready", Boolean(data.connected));
-    badge.classList.toggle("warn", !data.connected && data.environment !== "unconfigured");
-    text.textContent = data.connected
-      ? `${data.display_name || "Bahasha"} is connected with ${data.approved_template_count || 0} approved template(s). ${data.environment === "sandbox" ? "Sandbox mode does not send to real parents." : "Production mode is enabled."}`
-      : "Add the Bahasha API key and phone number ID in Vercel, then approve the required templates in Bahasha.";
+    const dot = $("#composeProviderDot");
+    const composeText = $("#composeProviderText");
+    const connected = Boolean(data?.connected);
+    const sandbox = data?.environment === "sandbox";
+    if (badge) {
+      badge.textContent = connected ? (sandbox ? "Sandbox" : "Live ready") : "Needs setup";
+      badge.classList.toggle("ready", connected && !sandbox);
+      badge.classList.toggle("warn", connected && sandbox);
+      badge.classList.toggle("bad", !connected);
+    }
+    if (text) {
+      text.textContent = connected
+        ? `${data.display_name || "Bahasha"} · ${data.approved_template_count || 0} approved template(s). ${sandbox ? "Sandbox mode does not send to real parents." : "Live connection is ready."}`
+        : "Connect Bahasha and approve a template before sending.";
+    }
+    if (dot) dot.classList.toggle("on", connected);
+    if (composeText) {
+      composeText.textContent = connected
+        ? sandbox
+          ? "Bahasha sandbox connected — no real delivery"
+          : "Bahasha live connection ready"
+        : "Bahasha connection needs setup";
+    }
+    UI.renderTemplateSelect();
   }
 
   async function loadStatus({ silent = false } = {}) {
@@ -123,57 +84,101 @@
     if (button) button.disabled = true;
     try {
       const data = await loadStatus();
-      UI.toast(data?.connected ? "Bahasha connection is ready." : "Bahasha setup is not complete.", data?.connected ? "success" : "");
+      UI.toast(data?.connected ? "Bahasha connection checked." : "Bahasha still needs setup.", data?.connected ? "success" : "error");
     } finally {
       if (button) button.disabled = false;
     }
   }
 
-  async function syncContacts(button) {
-    if (!confirm("Synchronize eligible WTS parent groups to Bahasha Contacts? This does not send messages.")) return;
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Syncing…";
-    }
-    try {
-      const result = await gatewayRequest("/api/bahasha-contacts-sync", "sync", { classKey: "all", limit: 1000 });
-      UI.toast(`Bahasha contacts synchronized: ${result.created || 0} created, ${result.updated || 0} updated.`, "success");
-    } catch (error) {
-      UI.toast(error.message, "error");
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = "Sync contacts";
-      }
-    }
+  function outcomeSummary(dispatch) {
+    const results = Array.isArray(dispatch?.results) ? dispatch.results : [];
+    const sent = results.filter((item) => ["sent", "delivered", "read", "simulated"].includes(String(item.status).toLowerCase())).length;
+    const failed = results.filter((item) => ["failed", "blocked"].includes(String(item.status).toLowerCase())).length;
+    return { sent, failed, processed: results.length };
   }
 
-  async function dispatchQueued() {
-    if (!confirm("Send the queued parent messages through Bahasha now?")) return;
-    const button = $("#dispatchQueued");
+  async function createParentMessage(event) {
+    event.preventDefault();
+    const button = $("#sendButton");
+    const template = UI.selectedTemplate();
+    const classKey = $("#composeClass")?.value || "";
+    const audience = $("input[name=audience]:checked")?.value || "all";
+    const selected = audience === "selected" ? selectedParents() : [];
+    const ready = state.contacts.filter((contact) => contact.eligible === true || contact.eligible === 1 || contact.eligible === "true");
+    const count = audience === "selected" ? selected.length : ready.length;
+    if (!template?.name) return UI.toast("Choose an approved Bahasha template first.", "error");
+    if (!classKey) return UI.toast("Choose a class first.", "error");
+    if (!count) return UI.toast("There are no ready parent contacts to send to.", "error");
+    const scope = UI.classNameFor(classKey);
+    if (!confirm(`Send "${template.name}" to ${count} parent${count === 1 ? "" : "s"} in ${scope}?`)) return;
     if (button) {
       button.disabled = true;
       button.textContent = "Sending…";
     }
     try {
-      const result = await gatewayRequest("/api/bahasha-dispatch", "dispatch", { limit: 25 });
-      UI.toast(`${result.claimed || 0} queued parent message(s) processed.`, "success");
+      const result = await API.templateSend({
+        audience,
+        recipientGroup: "guardian",
+        classKey,
+        whatsappTemplateName: template.name,
+        whatsappTemplateLanguage: template.language || template.language_code || "en_US",
+        selectedRecipients: selected,
+        contactIds: selectedContactIds(selected),
+      });
+      let dispatch = null;
+      if (result.queued) dispatch = await gatewayRequest("/api/bahasha-dispatch", "dispatch", { limit: result.queued });
+      const outcomes = outcomeSummary(dispatch);
+      const remaining = Math.max(0, Number(result.queued || 0) - outcomes.processed);
+      $("#bulkResult").hidden = false;
+      $("#bulkResult").innerHTML = `<strong>Message sent</strong><br>Template: ${UI.escapeHtml(template.name)}<br>Parent groups: ${UI.escapeHtml(result.created || count)}<br>Sent now: ${UI.escapeHtml(outcomes.sent)}${outcomes.failed ? `<br>Failed: ${UI.escapeHtml(outcomes.failed)}` : ""}${remaining ? `<br>Still queued: ${UI.escapeHtml(remaining)}` : ""}`;
+      UI.toast(outcomes.sent ? `${outcomes.sent} parent message(s) sent.` : "Message queued for delivery.", outcomes.failed ? "error" : "success");
       await Promise.all([UI.loadSummary(), UI.loadMessages()]);
     } catch (error) {
+      UI.toast(error.message, "error");
+      $("#bulkResult").hidden = false;
+      $("#bulkResult").textContent = error.message;
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Send message";
+      }
+      UI.renderTemplatePreview();
+    }
+  }
+
+  async function syncContacts(button, classKey = "") {
+    const selectedClass = classKey || $("#importClass")?.value || $("#composeClass")?.value || "";
+    if (!selectedClass) return UI.toast("Choose a class before syncing contacts.", "error");
+    if (!confirm(`Sync eligible ${UI.classNameFor(selectedClass)} parent contacts to Bahasha? This does not send messages.`)) return;
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Syncing…";
+    }
+    try {
+      const result = await gatewayRequest("/api/bahasha-contacts-sync", "sync", { classKey: selectedClass, limit: 1000 });
+      const output = `Bahasha contacts updated: ${result.created || 0} created, ${result.updated || 0} updated${result.failed ? `, ${result.failed} failed` : ""}.`;
+      if ($("#syncResult")) {
+        $("#syncResult").hidden = false;
+        $("#syncResult").textContent = output;
+      }
+      UI.toast(output, result.failed ? "error" : "success");
+    } catch (error) {
+      if ($("#syncResult")) {
+        $("#syncResult").hidden = false;
+        $("#syncResult").textContent = error.message;
+      }
       UI.toast(error.message, "error");
     } finally {
       if (button) {
         button.disabled = false;
-        button.textContent = "Send queued messages";
+        button.textContent = "Sync this class to Bahasha";
       }
     }
   }
 
   $("#composeForm").onsubmit = createParentMessage;
   $("#checkBahasha").onclick = checkBahasha;
-  $("#syncBahashaContacts").onclick = () => syncContacts($("#syncBahashaContacts"));
-  $("#syncContactsTemplates").onclick = () => syncContacts($("#syncContactsTemplates"));
-  $("#dispatchQueued").onclick = dispatchQueued;
+  $("#syncClassContacts").onclick = () => syncContacts($("#syncClassContacts"));
 
   window.WTS_NOTIFY_PROVIDER = Object.freeze({ loadStatus, syncContacts });
 })();

@@ -16,7 +16,7 @@ Guardian imports are performed one class at a time. The import validator matches
 
 The database intentionally keeps one child-level contact link per student. The parent directory and bulk sender group those links by the normalized WhatsApp destination. A class-scoped message includes only that class's child links; an all-school message includes all eligible child links on the destination. A group is eligible only when all links in the current scope are explicitly opted in (and, when configured, verified). This prevents duplicate sends without widening consent.
 
-The resulting message payload keeps `group_key`, `member_ids`, `student_ids`, `children` and `children_summary`, so delivery history can show which children were included in one parent message.
+The resulting message payload keeps `group_key`, `member_ids`, `student_ids`, `children` and `children_summary`, so delivery history can show which children were included in one parent message. A parent number is never sent once per child.
 
 ## Access
 
@@ -24,13 +24,14 @@ The module uses the unified Staff Portal PKCE handoff. There is no separate admi
 
 ## Bahasha delivery architecture
 
-1. WTS creates parent-only message records in the shared Supabase database.
-2. `/api/bahasha-dispatch` claims queued records through the existing protected notification worker contract.
-3. The Vercel Function calls `POST https://api.bahasha.app/v1/whatsapp/send` with an approved template.
-4. `/api/bahasha-webhook` accepts Bahasha verification and delivery/reply events.
-5. API keys remain in Vercel environment variables and are never sent to the browser.
+1. Staff choose an approved Bahasha template, one active class and either all ready parents or selected parents.
+2. WTS creates one parent-only message record per normalized WhatsApp number in the shared Supabase database. Siblings in the selected class are stored together in that record.
+3. `/api/bahasha-dispatch` claims queued records through the existing protected notification worker contract.
+4. The Vercel Function calls `POST https://api.bahasha.app/v1/whatsapp/send` with the selected approved template. The portal does not ask staff to type the template text again.
+5. `/api/bahasha-webhook` accepts Bahasha verification and delivery/reply events.
+6. API keys remain in Vercel environment variables and are never sent to the browser.
 
-`/api/bahasha-contacts-sync` is a separate management action. It reads eligible grouped parents from WTS, matches Bahasha Contacts by normalized number, and creates or updates contacts with WTS class tags and child-count attributes. It never sends a WhatsApp message.
+`/api/bahasha-contacts-sync` is a separate management action. It reads eligible grouped parents from WTS, matches Bahasha Contacts by normalized number, and creates or updates contacts with WTS class tags and child-count attributes. Importing or syncing a contact never sends a WhatsApp message; only the Send message button starts delivery.
 
 Required Vercel environment variables:
 
@@ -55,9 +56,9 @@ Use `bh_test_*` until template mapping and recipient selection are verified. A s
 
 ## Template alignment
 
-WTS has one internal catalogue for message purpose, language and variable mapping. Bahasha is the delivery template catalogue and Meta approval authority. The exact Bahasha template name, language and `APPROVED` status are used at send time; WTS does not create a second approval decision. The composer can pin an approved Bahasha template, while automatic purpose mappings remain in `BAHASHA_TEMPLATE_MAP`.
+Bahasha is the delivery template catalogue and Meta approval authority. The Send message screen lists only templates returned by Bahasha with `APPROVED` status. Staff select the template by name; WTS sends that approved template and its automatic parent/child details. There is no second free-text message box. If a Bahasha template still requires a manual `message` variable, WTS blocks that template-only send instead of silently sending the template name as the message.
 
-The navigation follows the operating sequence: `Overview` → `Import by class` → `Parents` → `Send message` → `Templates` → `Delivery`.
+The portal has three working areas: `Home`, `Send message` and `Delivery reports`. Contact import and Bahasha contact sync are kept under `Send message` because they prepare contacts; they do not deliver messages.
 
 Webhook URL:
 
