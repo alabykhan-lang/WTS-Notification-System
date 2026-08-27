@@ -36,7 +36,7 @@ The module uses the unified Staff Portal PKCE handoff. There is no separate admi
 5. `/api/bahasha-webhook` accepts Bahasha verification and delivery/reply events.
 6. API keys remain in Vercel environment variables and are never sent to the browser.
 
-`/api/bahasha-contacts-sync` is a separate management action. It reads eligible grouped parents from WTS, matches Bahasha Contacts by normalized number, and creates or updates contacts with WTS class tags and child-count attributes. Importing or syncing a contact never sends a WhatsApp message; only the Send message button starts delivery.
+`/api/bahasha-contacts-sync` is a separate management action. It reads all eligible grouped parents from WTS, matches Bahasha Contacts by normalized number, and creates or updates contacts with WTS class tags and child-count attributes. Importing or syncing a contact never sends a WhatsApp message; only the Send message button starts delivery.
 
 Required Vercel environment variables:
 

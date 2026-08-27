@@ -151,16 +151,14 @@
     }
   }
 
-  async function syncContacts(button, classKey = "") {
-    const selectedClass = classKey || $("#importClass")?.value || $("#composeClass")?.value || "";
-    if (!selectedClass) return UI.toast("Choose a class before syncing contacts.", "error");
-    if (!confirm(`Sync eligible ${UI.classNameFor(selectedClass)} parent contacts to Bahasha? This does not send messages.`)) return;
+  async function syncContacts(button) {
+    if (!confirm("Sync all eligible parent contacts to Bahasha? This does not send messages.")) return;
     if (button) {
       button.disabled = true;
       button.textContent = "Syncing…";
     }
     try {
-      const result = await gatewayRequest("/api/bahasha-contacts-sync", "sync", { classKey: selectedClass, limit: 1000 });
+      const result = await gatewayRequest("/api/bahasha-contacts-sync", "sync", { classKey: "all", limit: 2000 });
       const output = `Bahasha contacts updated: ${result.created || 0} created, ${result.updated || 0} updated${result.failed ? `, ${result.failed} failed` : ""}.`;
       if ($("#syncResult")) {
         $("#syncResult").hidden = false;
@@ -176,14 +174,14 @@
     } finally {
       if (button) {
         button.disabled = false;
-        button.textContent = "Sync this class to Bahasha";
+        button.textContent = "Sync all parents to Bahasha";
       }
     }
   }
 
   $("#composeForm").onsubmit = createParentMessage;
   $("#checkBahasha").onclick = checkBahasha;
-  $("#syncClassContacts").onclick = () => syncContacts($("#syncClassContacts"));
+  $("#syncAllContacts").onclick = () => syncContacts($("#syncAllContacts"));
 
   window.WTS_NOTIFY_PROVIDER = Object.freeze({ loadStatus, syncContacts });
 })();

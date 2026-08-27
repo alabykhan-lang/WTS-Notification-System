@@ -151,7 +151,7 @@
 
           <details class="card contact-setup">
             <summary>Import or update class contacts</summary>
-            <p class="section-copy">Importing saves numbers in WTS. Syncing sends the contact record to Bahasha; it does not send a WhatsApp message.</p>
+            <p class="section-copy">Importing saves numbers in WTS. Syncing copies all eligible parent records to Bahasha; it does not send a WhatsApp message.</p>
             <div class="setup-grid">
               <div>
                 <label>Class<select id="importClass"><option value="">Choose a class</option></select></label>
@@ -162,8 +162,8 @@
               <div class="sync-box">
                 <span class="eyebrow">BAHASHA CONTACTS</span>
                 <h3>After saving WTS contacts</h3>
-                <p>Click this button to copy eligible parents in the selected class to Bahasha. This action never sends a message.</p>
-                <button class="ghost" id="syncClassContacts" type="button">Sync this class to Bahasha</button>
+                <p>Click once to copy all eligible parent groups to Bahasha. Parents with children in different classes stay as one contact.</p>
+                <button class="ghost" id="syncAllContacts" type="button">Sync all parents to Bahasha</button>
                 <div class="result" id="syncResult" hidden></div>
               </div>
             </div>

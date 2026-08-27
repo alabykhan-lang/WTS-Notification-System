@@ -24,6 +24,7 @@ test("the portal exposes a simple template, class and recipient workflow", async
   assert.match(html, /Select parents and children/);
   assert.match(html, /Each parent appears once/);
   assert.match(html, /Import or update class contacts/);
+  assert.match(html, /Sync all parents to Bahasha/);
   assert.doesNotMatch(html, /Message details/);
   assert.doesNotMatch(html, /Prepare parent messages/);
   assert.match(app, /recipientRead\("recipients"/);
