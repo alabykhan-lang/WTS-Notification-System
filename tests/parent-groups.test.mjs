@@ -20,6 +20,7 @@ test("the portal exposes a simple template, class and recipient workflow", async
   assert.match(html, /Choose the class/);
   assert.match(html, /All ready parents in this class/);
   assert.match(html, /Only the parents I select/);
+  assert.match(html, /By class or section/);
   assert.match(html, /By parent/);
   assert.match(html, /Select parents and children/);
   assert.match(html, /Each parent appears once/);
@@ -28,6 +29,7 @@ test("the portal exposes a simple template, class and recipient workflow", async
   assert.doesNotMatch(html, /Message details/);
   assert.doesNotMatch(html, /Prepare parent messages/);
   assert.match(app, /recipientRead\("recipients"/);
+  assert.match(app, /section:/);
   assert.match(app, /guardianImportWrite\("validateBatch"/);
   assert.match(app, /type: "guardian_group"/);
   assert.match(bulk, /selectedRecipients/);

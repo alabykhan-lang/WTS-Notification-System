@@ -86,6 +86,9 @@
 
   function classNameFor(key) {
     if (!key) return "Choose a class";
+    if (String(key).startsWith("section:")) {
+      return `${prettify(String(key).slice("section:".length))} section`;
+    }
     return (
       state.classes.find((item) => item.class_key === key)?.display_name ||
       prettify(key)
@@ -121,7 +124,11 @@
   }
 
   function childrenText(contact) {
-    return childrenOf(contact)
+    return childrenTextFrom(childrenOf(contact));
+  }
+
+  function childrenTextFrom(children) {
+    return (Array.isArray(children) ? children : [])
       .map(
         (child) =>
           `${child.name || "Student"}${child.class_name ? ` (${child.class_name})` : ""}`,
@@ -137,8 +144,45 @@
     return document.querySelector("input[name=recipientMode]:checked")?.value || state.recipientMode || "class";
   }
 
+  function currentScope() {
+    if (recipientMode() === "parent") return { kind: "all", value: "all", classKey: "", section: "" };
+    const value = $("#composeClass")?.value || "";
+    if (value.startsWith("section:")) {
+      return { kind: "section", value, classKey: "", section: value.slice("section:".length) };
+    }
+    return { kind: value ? "class" : "none", value, classKey: value, section: "" };
+  }
+
   function currentClassKey() {
-    return recipientMode() === "parent" ? "all" : $("#composeClass")?.value || "";
+    const scope = currentScope();
+    return recipientMode() === "parent" || scope.kind === "section" ? "all" : scope.classKey;
+  }
+
+  function classSectionFor(classKey) {
+    const key = String(classKey || "");
+    return state.classes.find((item) => item.class_key === key)?.section || "";
+  }
+
+  function scopedChildrenForScope(contact, scope) {
+    const children = childrenOf(contact);
+    if (scope.kind === "class") return children.filter((child) => String(child.class_key || "") === scope.classKey);
+    if (scope.kind === "section") return children.filter((child) => classSectionFor(child.class_key) === scope.section);
+    return children;
+  }
+
+  function scopedChildrenOf(contact) {
+    return scopedChildrenForScope(contact, currentScope());
+  }
+
+  function scopedReadyChildrenOf(contact) {
+    return scopedChildrenOf(contact).filter((child) => isChildReady(child, contact));
+  }
+
+  function scopedMemberIds(contact) {
+    return scopedChildrenOf(contact)
+      .map((child) => child.contact_id)
+      .filter(Boolean)
+      .map((id) => String(id));
   }
 
   function templateVariableNames(template) {
@@ -171,20 +215,25 @@
   function selectedChildIds(contact) {
     const key = keyOf(contact);
     if (recipientMode() === "class") {
-      return new Set((state.selected.has(key) ? contact.member_ids || [] : []).map((id) => String(id)));
+      return new Set(state.selected.has(key) ? scopedMemberIds(contact) : []);
     }
     return new Set([...(state.selectedChildren.get(key) || [])].map((id) => String(id)));
   }
 
-  function selectedRecipients() {
+  function selectedRecipients({ includeAllScoped = false } = {}) {
     if (recipientMode() === "class") {
-      return [...state.selected]
+      const selectedKeys = includeAllScoped
+        ? state.contacts
+            .filter((contact) => scopedReadyChildrenOf(contact).length > 0)
+            .map(keyOf)
+        : [...state.selected];
+      return selectedKeys
         .map((groupKey) => state.contacts.find((contact) => keyOf(contact) === groupKey))
         .filter(Boolean)
         .map((contact) => ({
           type: "guardian_group",
           id: keyOf(contact),
-          memberIds: Array.isArray(contact.member_ids) ? contact.member_ids : [],
+          memberIds: scopedMemberIds(contact),
         }));
     }
     return state.contacts
@@ -226,16 +275,28 @@
     window.location.assign(`${window.WTS_CONFIG.portalOrigin}/workspace`);
   }
 
-  function populateClassSelect(selector) {
+  function populateClassSelect(selector, { includeSections = false, placeholder = "Choose a class or section" } = {}) {
     const select = $(selector);
     if (!select) return;
     const current = select.value;
-    const options = ['<option value="">Choose a class</option>'];
+    const options = [`<option value="">${escapeHtml(placeholder)}</option>`];
+    if (includeSections) {
+      const sections = [...new Set(state.classes.map((item) => item.section).filter(Boolean))];
+      if (sections.length) {
+        options.push('<optgroup label="Whole section">');
+        sections.forEach((section) => {
+          options.push(`<option value="section:${escapeHtml(section)}">${escapeHtml(classNameFor(`section:${section}`))}</option>`);
+        });
+        options.push("</optgroup>");
+      }
+    }
+    options.push('<optgroup label="Individual class">');
     state.classes.forEach((item) => {
       options.push(
         `<option value="${escapeHtml(item.class_key)}">${escapeHtml(item.display_name)}${item.student_count != null ? ` · ${escapeHtml(item.student_count)} students` : ""}</option>`,
       );
     });
+    options.push("</optgroup>");
     select.innerHTML = options.join("");
     if ([...select.options].some((option) => option.value === current)) select.value = current;
   }
@@ -243,8 +304,8 @@
   async function loadClasses() {
     const data = await API.recipientRead("classes");
     state.classes = data.classes || [];
-    populateClassSelect("#composeClass");
-    populateClassSelect("#importClass");
+    populateClassSelect("#composeClass", { includeSections: true });
+    populateClassSelect("#importClass", { placeholder: "Choose a class" });
     return state.classes;
   }
 
@@ -277,12 +338,18 @@
     return summary;
   }
 
-  async function loadClassRecipients(classKey, { resetSelection = false } = {}) {
+  async function loadClassRecipients(scopeValue, { resetSelection = false } = {}) {
     if (resetSelection) {
       state.selected.clear();
       state.selectedChildren.clear();
     }
-    if (!classKey) {
+    const scope = scopeValue?.kind ? scopeValue : (() => {
+      const value = String(scopeValue || "");
+      return value.startsWith("section:")
+        ? { kind: "section", value, classKey: "", section: value.slice("section:".length) }
+        : { kind: value ? "class" : "none", value, classKey: value, section: "" };
+    })();
+    if (!scope.value) {
       state.contacts = [];
       renderSendRecipients();
       renderSendState();
@@ -294,13 +361,16 @@
       const data = await API.recipientRead("recipients", {
         recipientType: "guardian",
         status: "",
-        classKey,
+        classKey: scope.kind === "class" ? scope.classKey : "all",
         pilotOnly: false,
-        limit: 1000,
+        limit: 2000,
       });
-      state.contacts = (data.recipients || []).filter(
+      const contacts = (data.recipients || []).filter(
         (contact) => contact.recipient_type !== "staff",
       );
+      state.contacts = scope.kind === "section"
+        ? contacts.filter((contact) => scopedChildrenForScope(contact, scope).length > 0)
+        : contacts;
       const currentKeys = new Set(state.contacts.map(keyOf));
       state.selected = new Set([...state.selected].filter((key) => currentKeys.has(key)));
       renderSendRecipients();
@@ -386,8 +456,9 @@
       classRows.innerHTML = state.contacts
         .map((contact) => {
           const key = keyOf(contact);
-          const ready = isReady(contact);
-          const children = childrenText(contact) || "No child link shown";
+          const children = scopedChildrenOf(contact);
+          const ready = scopedReadyChildrenOf(contact).length > 0;
+          const childrenLabel = childrenTextFrom(children) || "No child link shown";
           const reason = ready
             ? "Ready"
             : contact.whatsapp_number
@@ -395,7 +466,7 @@
               : "WhatsApp number missing";
           return `<label class="send-contact ${ready ? "" : "not-ready"}">
             <input type="checkbox" data-send-contact="${escapeHtml(key)}" ${state.selected.has(key) ? "checked" : ""} ${ready ? "" : "disabled"} />
-            <span><b>${escapeHtml(contact.display_name || "Parent")}</b><small>${escapeHtml(children)}</small><small>${escapeHtml(contact.whatsapp_number || "No WhatsApp number")}</small></span>
+            <span><b>${escapeHtml(contact.display_name || "Parent")}</b><small>${escapeHtml(childrenLabel)}</small><small>${escapeHtml(contact.whatsapp_number || "No WhatsApp number")}</small></span>
             <span class="badge ${ready ? "ready" : ""}">${escapeHtml(reason)}</span>
           </label>`;
         })
@@ -486,7 +557,7 @@
   function renderSendState() {
     const mode = recipientMode();
     const ready = mode === "class"
-      ? state.contacts.filter(isReady)
+      ? state.contacts.filter((contact) => scopedReadyChildrenOf(contact).length > 0)
       : state.contacts.filter((contact) => readyChildrenOf(contact).length > 0);
     const selectedReady = mode === "class"
       ? ready.filter((contact) => state.selected.has(keyOf(contact)))
@@ -498,9 +569,15 @@
     const childCount = mode === "parent"
       ? selectedChildCount()
       : audience === "selected"
-        ? selectedReady.reduce((total, contact) => total + (Array.isArray(contact.member_ids) ? contact.member_ids.length : 0), 0)
-        : ready.reduce((total, contact) => total + (Array.isArray(contact.member_ids) ? contact.member_ids.length : 0), 0);
+        ? selectedReady.reduce((total, contact) => total + scopedMemberIds(contact).length, 0)
+        : ready.reduce((total, contact) => total + scopedMemberIds(contact).length, 0);
     const templateIssue = templateDirectIssue(template);
+    const scope = currentScope();
+    if ($("#allAudienceLabel")) {
+      $("#allAudienceLabel").textContent = scope.kind === "section"
+        ? `All ready parents in the ${classNameFor(scope.value).toLowerCase()}`
+        : "All ready parents in this class";
+    }
     if ($("#allCount")) $("#allCount").textContent = `${ready.length} parent${ready.length === 1 ? "" : "s"}`;
     if ($("#selectedCount")) $("#selectedCount").textContent = `${selectedReady.length} selected`;
     if ($("#classRecipientStep")) $("#classRecipientStep").hidden = mode === "parent";
@@ -513,13 +590,13 @@
     let review = "Choose an approved message to continue.";
     if (templateIssue) {
       review = templateIssue;
-    } else if (template && mode === "class" && !classKey) {
-      review = "Choose a class to see its ready parent contacts.";
+    } else if (template && mode === "class" && !scope.value) {
+      review = "Choose a class or section to see its ready parent contacts.";
     } else if (template && mode === "class") {
       review = audience === "selected"
-        ? `${selectedReady.length} ready parent${selectedReady.length === 1 ? "" : "s"} selected in ${classNameFor(classKey)}.`
-        : `${ready.length} ready parent${ready.length === 1 ? "" : "s"} in ${classNameFor(classKey)}.`;
-      if (!count) review = `No ready parent contacts are available in ${classNameFor(classKey)}.`;
+        ? `${selectedReady.length} ready parent${selectedReady.length === 1 ? "" : "s"} selected in ${classNameFor(scope.value)}.`
+        : `${ready.length} ready parent${ready.length === 1 ? "" : "s"} in ${classNameFor(scope.value)}.`;
+      if (!count) review = `No ready parent contacts are available in ${classNameFor(scope.value)}.`;
     } else if (template && mode === "parent") {
       review = count
         ? `${count} parent${count === 1 ? "" : "s"} selected · ${childCount} child${childCount === 1 ? "" : "ren"} will be included.`
@@ -853,7 +930,9 @@
   });
   $$('input[name="audience"]').forEach((input) => { input.onchange = renderSendState; });
   $("#selectAllSend").onclick = () => {
-    state.contacts.filter(isReady).forEach((contact) => state.selected.add(keyOf(contact)));
+    state.contacts
+      .filter((contact) => scopedReadyChildrenOf(contact).length > 0)
+      .forEach((contact) => state.selected.add(keyOf(contact)));
     renderSendRecipients();
     renderSendState();
   };
@@ -911,6 +990,9 @@
     selectedRecipients,
     selectedRecipientCount,
     selectedChildCount,
+    currentScope,
+    scopedChildrenOf,
+    scopedReadyChildrenOf,
     templateDirectIssue,
     loadSummary,
     loadClasses,

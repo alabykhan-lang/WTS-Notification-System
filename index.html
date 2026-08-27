@@ -96,7 +96,7 @@
                 <div class="step-content">
                   <label>How do you want to choose parents?</label>
                   <div class="choice-list">
-                    <label class="choice"><input type="radio" name="recipientMode" value="class" checked /> <span><b>By class</b><small>Send one bulk message to ready parents in one class.</small></span></label>
+                    <label class="choice"><input type="radio" name="recipientMode" value="class" checked /> <span><b>By class or section</b><small>Send one bulk message to a class or a whole school section.</small></span></label>
                     <label class="choice"><input type="radio" name="recipientMode" value="parent" /> <span><b>By parent</b><small>Find a parent across all classes and choose one or more children.</small></span></label>
                   </div>
                 </div>
@@ -104,7 +104,7 @@
 
               <div class="send-step" id="classRecipientStep">
                 <span class="step-number">3</span>
-                <div class="step-content"><label>Choose the class<select id="composeClass"><option value="">Choose a class</option></select></label></div>
+                <div class="step-content"><label>Choose the class or section<select id="composeClass"><option value="">Choose a class or section</option></select></label></div>
               </div>
 
               <div class="send-step">
@@ -112,7 +112,7 @@
                 <div class="step-content">
                   <label>Who should receive the message?</label>
                   <div class="choice-list" id="classAudienceChoices">
-                    <label class="choice"><input type="radio" name="audience" value="all" checked /> <span><b>All ready parents in this class</b><small id="allCount">0 parents</small></span></label>
+                    <label class="choice"><input type="radio" name="audience" value="all" checked /> <span><b id="allAudienceLabel">All ready parents in this class</b><small id="allCount">0 parents</small></span></label>
                     <label class="choice"><input type="radio" name="audience" value="selected" /> <span><b>Only the parents I select</b><small id="selectedCount">0 selected</small></span></label>
                   </div>
                   <div class="recipient-picker" id="sendContacts" hidden>

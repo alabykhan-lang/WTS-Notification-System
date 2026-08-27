@@ -18,7 +18,7 @@ The database intentionally keeps one child-level contact link per student. The p
 
 The Send message screen has two recipient modes:
 
-- `By class` sends to all ready parents or selected parents in one class. Only that class's child links are included.
+- `By class or section` sends to all ready parents or selected parents in one class or a whole section such as Secondary. Only the selected scope's child links are included.
 - `By parent` loads the parent directory across all classes. Each parent appears once, and staff can tick one or more children—even children in different classes—for one merged WhatsApp message.
 
 The resulting message payload keeps `group_key`, `member_ids`, `student_ids`, `children` and `children_summary`, so delivery history can show which children were included in one parent message. A parent number is never sent once per child.

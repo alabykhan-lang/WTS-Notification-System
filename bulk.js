@@ -6,8 +6,8 @@
   const state = window.WTS_NOTIFY_STATE;
   const $ = (selector) => document.querySelector(selector);
 
-  function selectedParents() {
-    return UI.selectedRecipients();
+  function selectedParents(options = {}) {
+    return UI.selectedRecipients(options);
   }
 
   function selectedContactIds(groups) {
@@ -99,21 +99,27 @@
     const button = $("#sendButton");
     const template = UI.selectedTemplate();
     const mode = UI.recipientMode();
+    const scope = UI.currentScope();
     const classKey = UI.currentClassKey();
-    const audience = mode === "parent" ? "selected" : $("input[name=audience]:checked")?.value || "all";
-    const selected = audience === "selected" || mode === "parent" ? selectedParents() : [];
+    const requestedAudience = $("input[name=audience]:checked")?.value || "all";
+    // A whole-section scope is resolved to its child contact IDs in the browser;
+    // the database then groups those selected children by normalized WhatsApp number.
+    const audience = mode === "parent" || scope.kind === "section" ? "selected" : requestedAudience;
+    const selected = audience === "selected" || mode === "parent"
+      ? selectedParents({ includeAllScoped: scope.kind === "section" && requestedAudience === "all" })
+      : [];
     const ready = mode === "class"
-      ? state.contacts.filter((contact) => contact.eligible === true || contact.eligible === 1 || contact.eligible === "true")
+      ? state.contacts.filter((contact) => UI.scopedReadyChildrenOf(contact).length > 0)
       : selected;
     const count = audience === "selected" || mode === "parent" ? selected.length : ready.length;
     if (!template?.name) return UI.toast("Choose an approved Bahasha template first.", "error");
-    if (mode === "class" && !classKey) return UI.toast("Choose a class first.", "error");
+    if (mode === "class" && !scope.value) return UI.toast("Choose a class or section first.", "error");
     if (UI.templateDirectIssue(template)) return UI.toast(UI.templateDirectIssue(template), "error");
     if (!count) return UI.toast(mode === "parent" ? "Select a parent and at least one ready child." : "There are no ready parent contacts to send to.", "error");
-    const scope = mode === "parent" ? "the selected children" : UI.classNameFor(classKey);
+    const scopeLabel = mode === "parent" ? "the selected children" : UI.classNameFor(scope.value);
     const childCount = mode === "parent" ? UI.selectedChildCount() : "";
     const detail = childCount ? ` (${childCount} child${childCount === 1 ? "" : "ren"})` : "";
-    if (!confirm(`Send "${template.name}" to ${count} parent${count === 1 ? "" : "s"}${detail} in ${scope}?`)) return;
+    if (!confirm(`Send "${template.name}" to ${count} parent${count === 1 ? "" : "s"}${detail} in ${scopeLabel}?`)) return;
     if (button) {
       button.disabled = true;
       button.textContent = "Sending…";
