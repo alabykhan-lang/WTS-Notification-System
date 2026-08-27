@@ -213,10 +213,11 @@
         <section class="card setup-step">
           <span class="number">3</span>
           <div>
-            <h2>Approve the school templates</h2>
+            <h2>Create and approve the school templates</h2>
             <p>
-              Create these templates in Bahasha so each WTS message type has a
-              predictable route:
+              Bahasha is the delivery catalogue and Meta approval authority.
+              WTS keeps the purpose-to-template mapping, so WTS does not need
+              a second competing approval step. Create these names in Bahasha:
             </p>
             <div class="code-list">
               <code>wts_parent_notice</code><code>wts_attendance_notice</code
@@ -225,7 +226,9 @@
             </div>
             <p>
               Use named body variables such as <code>parent_name</code>,
-              <code>student_name</code>, and <code>message</code>.
+              <code>children_summary</code> (or <code>student_name</code>), and
+              <code>message</code>. The children value is a merged list when a
+              parent has more than one child.
             </p>
           </div>
         </section>

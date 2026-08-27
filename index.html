@@ -2,10 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width,initial-scale=1,viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <meta name="theme-color" content="#071b34" />
     <title>WTS Parent Notifications</title>
     <link rel="stylesheet" href="/styles.css" />
@@ -17,271 +14,111 @@
         <div class="auth-logo">WTS</div>
         <small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small>
         <h1>Opening Parent Notifications</h1>
-        <p>
-          Your Staff Portal session and Notifications permission are used
-          automatically.
-        </p>
-        <button class="primary" id="portalContinue" type="submit">
-          Continue with Staff Portal
-        </button>
-        <div class="auth-error" id="authError" aria-live="polite">
-          Checking your Staff Portal session…
-        </div>
+        <p>Your Staff Portal session and Notifications permission are used automatically.</p>
+        <button class="primary" id="portalContinue" type="submit">Continue with Staff Portal</button>
+        <div class="auth-error" id="authError" aria-live="polite">Checking your Staff Portal session…</div>
       </form>
     </section>
 
     <div class="shell">
       <aside>
-        <div class="brand">
-          <b>WTS</b><span>Parent<br />Notifications</span>
-        </div>
+        <div class="brand"><b>WTS</b><span>Parent<br />Notifications</span></div>
         <nav aria-label="Notification sections">
-          <button class="nav active" data-view="dashboard">Send message</button>
+          <button class="nav active" data-view="overview">Overview</button>
+          <button class="nav" data-view="compose">Send message</button>
           <button class="nav" data-view="contacts">Parents</button>
+          <button class="nav" data-view="imports">Import by class</button>
+          <button class="nav" data-view="templates">Templates</button>
           <button class="nav" data-view="delivery">Delivery</button>
         </nav>
-        <div class="connection">
-          <i id="dot"></i><span id="connectionText">Staff Portal access</span>
-        </div>
+        <div class="connection"><i id="dot"></i><span id="connectionText">Staff Portal access</span></div>
       </aside>
 
       <main>
         <header>
-          <div>
-            <small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small>
-            <h1 id="title">Parent communication</h1>
-          </div>
-          <div class="actions">
-            <button class="ghost" id="refresh">Refresh</button>
-            <button class="primary" id="login">Back to Staff Portal</button>
-          </div>
+          <div><small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1 id="title">Notification overview</h1></div>
+          <div class="actions"><button class="ghost" id="refresh">Refresh</button><button class="primary" id="login">Back to Staff Portal</button></div>
         </header>
 
-        <div class="notice">
-          <b>Parents only.</b> Staff and teachers are not notification
-          recipients in this system.
-        </div>
+        <div class="notice"><b>Parents only.</b> Staff and teachers are not notification recipients in this system. Each active child link stays in the registry for attendance and audit. The directory and WhatsApp sender group links by normalized parent number, so siblings share one message.</div>
 
-        <section class="view active" id="view-dashboard">
+        <section class="view active" id="view-overview">
           <div class="metrics">
-            <article>
-              <span>Parents</span><strong id="mContacts">0</strong>
-            </article>
-            <article>
-              <span>WhatsApp ready</span><strong id="mOptin">0</strong>
-            </article>
-            <article>
-              <span>Delivered</span><strong id="mDelivered">0</strong>
-            </article>
-            <article>
-              <span>Failed</span><strong id="mFailed">0</strong>
-            </article>
+            <article><span>Parent groups</span><strong id="mContacts">0</strong><small>One WhatsApp destination per group</small></article>
+            <article><span>Child links</span><strong id="mChildren">0</strong><small>Students connected to guardians</small></article>
+            <article><span>WhatsApp ready</span><strong id="mOptin">0</strong><small>All linked children opted in</small></article>
+            <article><span>Delivered</span><strong id="mDelivered">0</strong><small><span id="mFailed">0</span> failed</small></article>
           </div>
 
-          <div class="dashboard-grid">
-            <form class="card compose-card" id="composeForm">
-              <div class="card-heading">
-                <div>
-                  <span class="step">NEW MESSAGE</span>
-                  <h2>What should parents receive?</h2>
-                </div>
-                <span class="channel-pill">WhatsApp</span>
+          <div class="dashboard-grid overview-grid">
+            <article class="card start-card">
+              <div class="card-heading"><div><span class="step">CONTROL CENTRE</span><h2>Run the workflow in order</h2></div><span class="channel-pill">WhatsApp</span></div>
+              <div class="workflow">
+                <button class="workflow-step" data-go="imports"><b>1</b><span><strong>Import class contacts</strong><small>Match each row to a student, then sync it to the Central Registry.</small></span><em>→</em></button>
+                <button class="workflow-step" data-go="contacts"><b>2</b><span><strong>Review parent groups</strong><small>See siblings together, consent, class membership and send readiness.</small></span><em>→</em></button>
+                <button class="workflow-step" data-go="compose"><b>3</b><span><strong>Prepare one message per parent</strong><small>Choose all or selected groups and keep the class scope visible.</small></span><em>→</em></button>
               </div>
-
-              <div class="form-grid">
-                <label>
-                  Message type
-                  <select id="purpose">
-                    <option value="general_announcement">
-                      General announcement
-                    </option>
-                    <option value="attendance">Attendance update</option>
-                    <option value="fees">School fees</option>
-                    <option value="academic_result">
-                      Result or performance
-                    </option>
-                    <option value="emergency">Emergency notice</option>
-                  </select>
-                </label>
-                <label>
-                  Send to
-                  <select id="audience">
-                    <option value="all">All eligible parents</option>
-                    <option value="selected">Selected parents</option>
-                  </select>
-                </label>
-                <label class="full">
-                  Message details
-                  <textarea
-                    id="message"
-                    rows="7"
-                    placeholder="Write the information parents should receive"
-                    required
-                  ></textarea>
-                </label>
-                <label class="check full">
-                  <input type="checkbox" id="queueNow" />
-                  Queue for automatic WhatsApp delivery after preparation
-                </label>
-              </div>
-              <div class="compose-actions">
-                <p>Only opted-in and verified parent numbers are eligible.</p>
-                <button class="primary" type="submit">
-                  Prepare parent message
-                </button>
-              </div>
-              <div class="result" id="bulkResult">No message prepared yet.</div>
-            </form>
-
+            </article>
             <div class="side-stack">
               <article class="card provider-card">
-                <div class="card-heading">
-                  <div>
-                    <span class="step">DELIVERY</span>
-                    <h2>Bahasha connection</h2>
-                  </div>
-                  <span class="status-chip" id="providerBadge"
-                    >Not checked</span
-                  >
-                </div>
-                <p id="providerText">
-                  Connect the official Bahasha API once, then WTS can send
-                  approved messages automatically.
-                </p>
-                <div class="button-row">
-                  <button class="ghost" id="checkBahasha" type="button">
-                    Check connection
-                  </button>
-                  <a class="primary button-link" href="/whatsapp.html"
-                    >Connection guide</a
-                  >
-                </div>
+                <div class="card-heading"><div><span class="step">DELIVERY PROVIDER</span><h2>Bahasha connection</h2></div><span class="status-chip" id="providerBadge">Not checked</span></div>
+                <p id="providerText">Bahasha sends WhatsApp templates after the corresponding template has been approved in its Meta-connected system.</p>
+                <div class="button-row"><button class="ghost" id="checkBahasha" type="button">Check connection</button><button class="ghost" id="syncBahashaContacts" type="button">Sync contacts</button><a class="primary button-link" href="/whatsapp.html">Connection guide</a></div>
               </article>
-
-              <article class="card">
-                <span class="step">AUTOMATION</span>
-                <h2>Attendance alerts</h2>
-                <p>
-                  Prepare absence, late-arrival, check-in and check-out messages
-                  from Attendance records.
-                </p>
-                <button class="ghost" id="prepareAttendance" type="button">
-                  Prepare today’s alerts
-                </button>
-              </article>
+              <article class="card"><span class="step">AUTOMATION</span><h2>Attendance alerts</h2><p>Prepare absence, late-arrival, check-in and check-out messages from Attendance records.</p><button class="ghost" id="prepareAttendance" type="button">Prepare today’s alerts</button></article>
             </div>
+          </div>
+
+          <article class="card model-card"><div><span class="step">DATA MODEL</span><h2>How duplicate parent numbers are handled</h2></div><div class="model-columns"><p><b>Registry record</b><br />One child-to-guardian link is preserved for class, relationship, consent and attendance history.</p><p><b>Parent group</b><br />When two or more links share the same normalized WhatsApp number, they appear as one group.</p><p><b>Message</b><br />A class-scoped send includes that class’s children; an all-school send includes every eligible child on the number.</p></div></article>
+        </section>
+
+        <section class="view" id="view-compose">
+          <div class="section-head"><div><small>MESSAGE BUILDER</small><h2>Prepare a parent message</h2><p class="section-copy">The sender creates one queued message per eligible parent group, not one per child.</p></div><span class="channel-pill">WhatsApp only</span></div>
+          <div class="dashboard-grid compose-grid">
+            <form class="card compose-card" id="composeForm">
+              <div class="form-grid">
+                <label>Class scope<select id="composeClass"><option value="all">All active classes</option></select><small class="field-help">Use a class to keep the merged child list limited to that class.</small></label>
+                <label>Message type<select id="purpose"><option value="general_announcement">General announcement</option><option value="attendance">Attendance update</option><option value="fees">School fees</option><option value="academic_result">Result or performance</option><option value="emergency">Emergency notice</option></select></label>
+                <label>Send to<select id="audience"><option value="all">All eligible parent groups</option><option value="selected">Selected parent groups</option></select><small class="field-help">Selected groups come from Parents in the same class scope.</small></label>
+                <label>Approved Bahasha template<select id="templateSelect"><option value="">Auto-map from message type</option></select><small class="field-help" id="templateHelp">The selected name/language must be APPROVED in Bahasha before delivery.</small></label>
+                <label class="full">Message details<textarea id="message" rows="6" placeholder="Write the information parents should receive" required></textarea><small class="field-help">WTS stores the operational message. Bahasha receives the approved template and its variables.</small></label>
+                <label class="check full"><input type="checkbox" id="queueNow" /> Queue for automatic WhatsApp delivery after preparation</label>
+              </div>
+              <div class="compose-actions"><p>Only parent groups with complete opted-in WhatsApp links are eligible.</p><button class="primary" type="submit">Prepare parent messages</button></div>
+              <div class="result" id="bulkResult">Choose a class and message type to see the merged-message estimate.</div>
+            </form>
+            <aside class="preview-panel card"><span class="step">LIVE PREVIEW</span><h2>One parent, all selected children</h2><p id="mergePreviewText">Select a class or refresh the parent directory to preview a merged parent group.</p><div class="preview-message" id="mergePreview"><span class="preview-label">Example child block</span><div id="mergePreviewChildren">No eligible group selected yet.</div></div><div class="estimate" id="recipientEstimate"><b>0</b><span>eligible parent groups in this scope</span></div><button class="ghost" type="button" data-go="contacts">Review parent groups</button></aside>
           </div>
         </section>
 
         <section class="view" id="view-contacts">
-          <div class="section-head">
-            <div>
-              <small>PARENT DIRECTORY</small>
-              <h2>Eligible parent contacts</h2>
-            </div>
-            <button class="ghost" id="selectAll">Select all visible</button>
-          </div>
-          <div class="filters card recipient-filters">
-            <input
-              id="contactSearch"
-              placeholder="Search parent, student or phone"
-            />
-            <select id="contactStatus">
-              <option value="">All consent statuses</option>
-              <option value="opted_in">Opted in</option>
-              <option value="pending">Pending</option>
-              <option value="opted_out">Opted out</option>
-              <option value="revoked">Revoked</option>
-            </select>
-            <button class="ghost" id="contactFind">Search</button>
-          </div>
-          <div class="card table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Select</th>
-                  <th>Parent</th>
-                  <th>Student</th>
-                  <th>WhatsApp</th>
-                  <th>Consent</th>
-                  <th>Verified</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="contactRows"></tbody>
-            </table>
-            <div class="empty" id="contactEmpty">
-              No parents found. Add guardian contact details in Central
-              Registry.
-            </div>
-          </div>
+          <div class="section-head"><div><small>PARENT DIRECTORY</small><h2>Parent groups by class</h2><p class="section-copy" id="contactScopeText">Each row is one WhatsApp destination. Children remain visible underneath.</p></div><div class="section-actions"><button class="ghost" id="selectAll" type="button">Select all visible</button><button class="primary" type="button" data-go="compose">Use selected</button></div></div>
+          <div class="filters card recipient-filters"><select id="contactClass"><option value="all">All active classes</option></select><input id="contactSearch" placeholder="Search parent, child, class or phone" /><select id="contactStatus"><option value="">All consent statuses</option><option value="opted_in">Ready / opted in</option><option value="partial">Partial consent</option><option value="pending">Pending</option><option value="opted_out">Opted out</option><option value="revoked">Revoked</option></select><button class="ghost" id="contactFind" type="button">Search</button></div>
+          <div class="directory-summary" id="contactSummary"></div>
+          <div class="card table-wrap"><table class="directory-table"><thead><tr><th>Select</th><th>Parent group</th><th>Children in scope</th><th>WhatsApp</th><th>Consent</th><th>Ready</th><th>Action</th></tr></thead><tbody id="contactRows"></tbody></table><div class="empty" id="contactEmpty">No parent groups found. Import guardian details for a class from the Central Registry.</div></div>
         </section>
 
-        <section class="view" id="view-delivery">
-          <div class="section-head">
-            <div>
-              <small>MESSAGE HISTORY</small>
-              <h2>Delivery status</h2>
-            </div>
-            <div class="delivery-actions">
-              <select id="messageStatus">
-                <option value="">All statuses</option>
-                <option value="draft">Draft</option>
-                <option value="queued">Queued</option>
-                <option value="sent">Sent</option>
-                <option value="delivered">Delivered</option>
-                <option value="read">Read</option>
-                <option value="failed">Failed</option>
-              </select>
-              <button class="primary" id="dispatchQueued" type="button">
-                Send queued messages
-              </button>
-            </div>
+        <section class="view" id="view-imports">
+          <div class="section-head"><div><small>CONTACT INTAKE</small><h2>Import guardians class by class</h2><p class="section-copy">Select the class before validating the file. Rows that resolve to another class are rejected from this batch.</p></div><button class="ghost" id="downloadImportTemplate" type="button">Download CSV template</button></div>
+          <div class="dashboard-grid import-grid">
+            <form class="card" id="importForm"><label>Class to populate<select id="importClass"><option value="">Select an active class</option></select></label><label>Batch name<input id="importBatchName" placeholder="e.g. Primary 3 guardian contacts" /></label><label>CSV file<input id="importFile" type="file" accept=".csv,text/csv" /></label><label>Or paste CSV rows<textarea id="importText" rows="10" placeholder="studentAdmissionNumber,studentName,guardianName,relationship,phone,whatsappNumber,email,preferredChannels,isPrimary,preferredLanguage,consentStatus,consentSource,notes"></textarea></label><p class="field-help">Use the student admission number whenever possible. A WhatsApp opt-in must include a consent source; blank consent stays pending.</p><div class="button-row"><button class="primary" id="validateImport" type="submit">Validate class import</button><button class="ghost" id="applyImport" type="button" disabled>Apply to Central Registry</button></div><div class="result" id="importResult">No class import staged.</div></form>
+            <article class="card import-guide"><span class="step">SAFE SYNC</span><h2>What happens after validation?</h2><ol><li>Every row is matched to one active student in the selected class.</li><li>Guardian details update the canonical guardian relationship and notification contact.</li><li>Only explicit opted-in WhatsApp rows become delivery-ready.</li><li>After applying, use Templates &amp; Bahasha to synchronize parent groups to Bahasha Contacts.</li></ol><div class="mini-note">This import does not send a message and does not spend WhatsApp credits.</div></article>
           </div>
-          <div id="messageList" class="message-list"></div>
+          <article class="card import-preview" id="importPreviewCard" hidden><div class="section-head compact-head"><div><span class="step">VALIDATION PREVIEW</span><h2 id="importPreviewTitle">Rows</h2></div><span class="status-chip" id="importPreviewStatus">—</span></div><div id="importRows" class="import-rows"></div></article>
         </section>
+
+        <section class="view" id="view-templates">
+          <div class="section-head"><div><small>MESSAGE GOVERNANCE</small><h2>WTS templates &amp; Bahasha approval</h2><p class="section-copy">WTS keeps the message purpose and mapping. Bahasha/Meta remains the source of truth for approval and delivery.</p></div><div class="section-actions"><button class="ghost" id="refreshTemplates" type="button">Refresh templates</button><button class="primary" id="syncContactsTemplates" type="button">Sync Bahasha contacts</button></div></div>
+          <div class="template-explainer card"><div><span class="step">ONE TEMPLATE CHAIN</span><h2>How the two systems align</h2></div><div class="template-chain"><span>Message purpose</span><b>→</b><span>WTS mapping</span><b>→</b><span>Bahasha template</span><b>→</b><span>Meta approval</span></div><p>Do not create a second competing approval process in WTS. The local catalogue is for purpose, language and variable mapping; the exact template name, language and APPROVED status come from Bahasha.</p></div>
+          <div class="template-grid"><article class="card"><div class="card-heading"><div><span class="step">LOCAL CATALOGUE</span><h2>WTS message templates</h2></div><span class="status-chip" id="internalTemplateCount">0</span></div><div id="internalTemplates" class="template-list"><div class="empty">Loading internal templates…</div></div></article><article class="card"><div class="card-heading"><div><span class="step">REMOTE CATALOGUE</span><h2>Bahasha templates</h2></div><span class="status-chip" id="remoteTemplateCount">Not checked</span></div><div id="remoteTemplates" class="template-list"><div class="empty">Check the Bahasha connection to load remote templates.</div></div></article></div>
+        </section>
+
+        <section class="view" id="view-delivery"><div class="section-head"><div><small>MESSAGE HISTORY</small><h2>Delivery status</h2><p class="section-copy">Messages are grouped at creation time, then Bahasha delivery is tracked per parent group.</p></div><div class="delivery-actions"><select id="messageStatus"><option value="">All statuses</option><option value="draft">Draft</option><option value="queued">Queued</option><option value="sending">Sending</option><option value="sent">Sent</option><option value="delivered">Delivered</option><option value="read">Read</option><option value="failed">Failed</option></select><button class="primary" id="dispatchQueued" type="button">Send queued messages</button></div></div><div id="messageList" class="message-list"></div></section>
       </main>
     </div>
 
-    <dialog id="recipientDialog">
-      <form method="dialog" id="recipientForm">
-        <h2 id="recipientTitle">Parent contact</h2>
-        <input id="recipientId" type="hidden" />
-        <label
-          >WhatsApp number<input
-            id="recipientWhatsapp"
-            inputmode="tel"
-            placeholder="080… or +234…"
-        /></label>
-        <label>
-          Consent status
-          <select id="recipientConsent">
-            <option value="pending">Pending</option>
-            <option value="opted_in">Opted in</option>
-            <option value="opted_out">Opted out</option>
-            <option value="revoked">Revoked</option>
-          </select>
-        </label>
-        <label
-          >Consent source<input
-            id="recipientConsentSource"
-            placeholder="Signed form or phone confirmation"
-        /></label>
-        <label class="check"
-          ><input id="recipientVerified" type="checkbox" /> Number
-          verified</label
-        >
-        <div class="dialog-actions">
-          <button value="cancel" class="ghost">Cancel</button
-          ><button value="default" class="primary">Save parent</button>
-        </div>
-      </form>
-    </dialog>
-
+    <dialog id="recipientDialog"><form method="dialog" id="recipientForm"><h2 id="recipientTitle">Parent contact</h2><p class="dialog-note" id="recipientChildren"></p><input id="recipientId" type="hidden" /><label>WhatsApp number<input id="recipientWhatsapp" inputmode="tel" placeholder="080… or +234…" /></label><label>Consent status<select id="recipientConsent"><option value="pending">Pending</option><option value="opted_in">Opted in</option><option value="opted_out">Opted out</option><option value="revoked">Revoked</option></select></label><label>Consent source<input id="recipientConsentSource" placeholder="Signed form or phone confirmation" /></label><label class="check"><input id="recipientVerified" type="checkbox" /> Number verified</label><div class="dialog-actions"><button value="cancel" class="ghost">Cancel</button><button value="default" class="primary">Save child link</button></div></form></dialog>
     <div id="toasts"></div>
-    <script src="/config.js"></script>
-    <script src="/api.js"></script>
-    <script src="/app.js"></script>
-    <script src="/bulk.js"></script>
+    <script src="/config.js"></script><script src="/api.js"></script><script src="/app.js"></script><script src="/bulk.js"></script>
   </body>
 </html>

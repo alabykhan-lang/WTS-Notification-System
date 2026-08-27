@@ -4,6 +4,12 @@
   "functions": {
     "api/meta-dispatch.js": {
       "maxDuration": 60
+    },
+    "api/bahasha-dispatch.js": {
+      "maxDuration": 60
+    },
+    "api/bahasha-contacts-sync.js": {
+      "maxDuration": 60
     }
   },
   "headers": [

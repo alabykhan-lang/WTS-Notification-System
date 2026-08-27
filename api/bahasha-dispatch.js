@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("node:crypto");
 const { rpc, readBody, sendJson } = require("./_meta");
 const {
   config,

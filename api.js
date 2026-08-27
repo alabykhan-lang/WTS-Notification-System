@@ -67,6 +67,10 @@
       rpc("school_notification_recipient_admin_read_api", action, payload),
     recipientWrite: (action, payload = {}) =>
       rpc("school_notification_recipient_admin_write_api", action, payload),
+    guardianImportRead: (action, payload = {}) =>
+      rpc("school_guardian_import_admin_read_api", action, payload),
+    guardianImportWrite: (action, payload = {}) =>
+      rpc("school_guardian_import_admin_write_api", action, payload),
     bulk: (payload) =>
       rpc("school_notification_bulk_message_api", null, payload),
     getAuth: auth,

@@ -124,14 +124,58 @@ async function listTemplates(phoneNumberId = config().phoneNumberId) {
   );
 }
 
+async function listContacts({ page = 1, limit = 500, search = "" } = {}) {
+  const query = new URLSearchParams({
+    page: String(page),
+    limit: String(Math.min(Math.max(Number(limit) || 500, 1), 500)),
+  });
+  if (search) query.set("search", String(search));
+  return request(`/v1/organization/contacts?${query.toString()}`);
+}
+
+async function createContact(payload) {
+  return request("/v1/organization/contacts", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+async function updateContact(id, payload) {
+  return request(`/v1/organization/contacts/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+function childrenSummary(message) {
+  const payload = message?.payload || {};
+  if (payload.children_summary) return String(payload.children_summary);
+  if (Array.isArray(payload.children) && payload.children.length) {
+    return payload.children
+      .map((child) => `${child.name || "Student"}${child.class_name ? ` (${child.class_name})` : ""}`)
+      .join(", ");
+  }
+  return "";
+}
+
+function mergedMessage(message) {
+  const base = String(message?.message || message?.payload?.message || "");
+  const children = childrenSummary(message);
+  if (!children || base.toLowerCase().includes(children.toLowerCase())) return base;
+  return `${base}\n\nChildren in this message: ${children}`;
+}
+
 function messageValue(message, key) {
   const payload = message.payload || {};
+  const children = childrenSummary(message);
   const values = {
     parent_name: message.recipient_name || payload.guardian_name || "Parent",
     guardian_name: message.recipient_name || payload.guardian_name || "Parent",
-    student_name:
-      payload.student_name || message.associated_name || "your child",
-    message: message.message || payload.message || "",
+    student_name: children || payload.student_name || message.associated_name || "your child",
+    children_summary: children,
+    child_count: payload.child_count || (Array.isArray(payload.children) ? payload.children.length : ""),
+    class_name: payload.class_name || payload.group_name || "",
+    message: mergedMessage(message),
   };
   return values[key] ?? payload[key] ?? "";
 }
@@ -164,7 +208,7 @@ function templateFor(message, templates) {
     templates.find(
       (item) => item.name === name && item.language === language,
     ) || templates.find((item) => item.name === name);
-  if (!template || template.status !== "APPROVED") {
+  if (!template || String(template.status || "").toUpperCase() !== "APPROVED") {
     const error = new Error(
       `Approved Bahasha template not found for ${purpose}: ${name || "not mapped"}`,
     );
@@ -197,6 +241,10 @@ async function sendTemplate({ to, name, language, variables }) {
 module.exports = {
   config,
   e164,
+  request,
+  listContacts,
+  createContact,
+  updateContact,
   listPhoneNumbers,
   listTemplates,
   templateFor,
