@@ -38,18 +38,27 @@ jobs:
           node --check api/meta-setup.js
           node --check api/meta-dispatch.js
           node --check api/meta-webhook.js
-          grep -q 'Notification Management Login' index.html
+          node --check api/_bahasha.js
+          node --check api/bahasha-status.js
+          node --check api/bahasha-dispatch.js
+          node --check api/bahasha-contacts-sync.js
+          node --check api/bahasha-webhook.js
+          grep -q 'Open Notifications' index.html
           grep -q 'class="locked"' index.html
           grep -q 'school_notification_control_read_api' api.js
-          grep -q 'school_notification_control_write_api' api.js
-          grep -q 'school_notification_bulk_message_api' api.js
-          grep -q 'API.bulk' bulk.js
-          grep -q '/api/meta-dispatch' bulk.js
+          grep -q 'school_notification_template_send_api' api.js
+          grep -q 'school_notification_message_admin_write_api' api.js
+          grep -q 'API.templateSend' bulk.js
+          grep -q '/api/bahasha-dispatch' bulk.js
+          grep -q 'Choose a message template' index.html
+          grep -q 'All ready parents in this class' index.html
+          grep -q 'Delivery reports' index.html
+          grep -q 'school_meta_whatsapp_status_api' api/bahasha-status.js
+          grep -q 'school_meta_whatsapp_claim_api' api/bahasha-dispatch.js
+          grep -q 'school_meta_whatsapp_complete_api' api/bahasha-dispatch.js
           grep -q 'WhatsApp Delivery Setup' whatsapp.html
           grep -q 'school_meta_whatsapp_configure_api' api/meta-setup.js
-          grep -q 'school_meta_whatsapp_claim_api' api/meta-dispatch.js
-          grep -q 'school_meta_whatsapp_webhook_status_secure' api/meta-webhook.js
-          grep -q 'school_identity_portal_login' identity-login.js
-          grep -q 'school_identity_change_password' identity-login.js
           if grep -q 'public-live.js' index.html; then echo 'Public live loader must not be used'; exit 1; fi
           if grep -RIn -E 'SUPABASE_SERVICE_ROLE_KEY|service_role_key|sb_secret_|WTS_WHATSAPP_GATEWAY_TOKEN|EA[A-Za-z0-9]{80,}' . --exclude-dir=.git; then exit 1; fi
+      - name: Run tests
+        run: npm test
