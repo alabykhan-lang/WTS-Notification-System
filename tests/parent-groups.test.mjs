@@ -111,3 +111,40 @@ test("template-only delivery rejects a template that still needs manual message 
   if (previous.phone === undefined) delete process.env.BAHASHA_PHONE_NUMBER_ID;
   else process.env.BAHASHA_PHONE_NUMBER_ID = previous.phone;
 });
+
+test("template-only delivery maps ward lists to the merged children automatically", () => {
+  const previous = {
+    token: process.env.BAHASHA_API_TOKEN,
+    phone: process.env.BAHASHA_PHONE_NUMBER_ID,
+  };
+  process.env.BAHASHA_API_TOKEN = "bh_test_ward_list";
+  process.env.BAHASHA_PHONE_NUMBER_ID = "test-phone-id";
+  const helper = require("../api/_bahasha.js");
+  const message = helper.templateFor(
+    {
+      recipient_name: "Parent Group",
+      message: "wts_resumption_notice",
+      payload: {
+        template_only: true,
+        whatsapp_template_name: "wts_resumption_notice",
+        children_summary: "Student One (Primary 3), Student Two (Primary 3)",
+      },
+    },
+    [
+      {
+        name: "wts_resumption_notice",
+        language: "en_US",
+        status: "APPROVED",
+        expected_variables: { body: [{ param_name: "ward_list" }] },
+      },
+    ],
+  );
+  assert.equal(
+    message.variables.body.ward_list,
+    "Student One (Primary 3), Student Two (Primary 3)",
+  );
+  if (previous.token === undefined) delete process.env.BAHASHA_API_TOKEN;
+  else process.env.BAHASHA_API_TOKEN = previous.token;
+  if (previous.phone === undefined) delete process.env.BAHASHA_PHONE_NUMBER_ID;
+  else process.env.BAHASHA_PHONE_NUMBER_ID = previous.phone;
+});

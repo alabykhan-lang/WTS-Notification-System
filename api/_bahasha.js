@@ -168,13 +168,30 @@ function mergedMessage(message) {
 function messageValue(message, key) {
   const payload = message.payload || {};
   const children = childrenSummary(message);
+  const childList =
+    children || payload.student_name || message.associated_name || "your child";
+  const className = payload.class_name || payload.group_name || "";
+  const schoolName =
+    payload.school_name || "Way to Success Standard Schools, Ejigbo";
   const values = {
     parent_name: message.recipient_name || payload.guardian_name || "Parent",
     guardian_name: message.recipient_name || payload.guardian_name || "Parent",
-    student_name: children || payload.student_name || message.associated_name || "your child",
+    student_name: childList,
+    student_list: childList,
+    student_names: childList,
+    children: childList,
     children_summary: children,
+    children_list: childList,
+    ward_list: childList,
+    ward_name: childList,
+    ward_names: childList,
+    wards: childList,
     child_count: payload.child_count || (Array.isArray(payload.children) ? payload.children.length : ""),
-    class_name: payload.class_name || payload.group_name || "",
+    class_name: className,
+    class: className,
+    class_list: className,
+    school: schoolName,
+    school_name: schoolName,
     date: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeZone: "Africa/Lagos" }).format(new Date()),
     time: new Intl.DateTimeFormat("en-NG", { timeStyle: "short", timeZone: "Africa/Lagos" }).format(new Date()),
     message: payload.template_only ? String(payload.custom_message || "") : mergedMessage(message),
