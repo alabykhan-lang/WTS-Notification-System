@@ -45,15 +45,17 @@
     const composeText = $("#composeProviderText");
     const connected = Boolean(data?.connected);
     const sandbox = data?.environment === "sandbox";
+    const liveReady = Boolean(data?.live_delivery_ready);
+    const deliveryOff = connected && !liveReady;
     if (badge) {
-      badge.textContent = connected ? (sandbox ? "Sandbox" : "Live ready") : "Needs setup";
-      badge.classList.toggle("ready", connected && !sandbox);
-      badge.classList.toggle("warn", connected && sandbox);
+      badge.textContent = !connected ? "Needs setup" : deliveryOff ? "Delivery off" : sandbox ? "Sandbox" : "Live ready";
+      badge.classList.toggle("ready", connected && liveReady && !sandbox);
+      badge.classList.toggle("warn", connected && (!liveReady || sandbox));
       badge.classList.toggle("bad", !connected);
     }
     if (text) {
       text.textContent = connected
-        ? `${data.display_name || "Bahasha"} · ${data.approved_template_count || 0} approved template(s). ${sandbox ? "Sandbox mode does not send to real parents." : "Live connection is ready."}`
+        ? `${data.display_name || "Bahasha"} · ${data.approved_template_count || 0} approved template(s). ${sandbox ? "Sandbox mode does not send to real parents." : deliveryOff ? "Live delivery is switched off." : "Live connection is ready."}`
         : "Connect Bahasha and approve a template before sending.";
     }
     if (dot) dot.classList.toggle("on", connected);
@@ -61,7 +63,9 @@
       composeText.textContent = connected
         ? sandbox
           ? "Bahasha sandbox connected — no real delivery"
-          : "Bahasha live connection ready"
+          : deliveryOff
+            ? "Bahasha connected — live delivery is switched off"
+            : "Bahasha live connection ready"
         : "Bahasha connection needs setup";
     }
     UI.renderTemplateSelect();

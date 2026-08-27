@@ -277,7 +277,8 @@
       review = "Choose a class to see its ready parent contacts.";
     }
     if ($("#sendReview")) $("#sendReview").textContent = review;
-    const canSend = Boolean(template && classKey && count && state.provider?.connected !== false);
+    const deliveryReady = state.provider?.live_delivery_ready === true;
+    const canSend = Boolean(template && classKey && count && deliveryReady);
     if ($("#sendButton")) $("#sendButton").disabled = !canSend;
   }
 

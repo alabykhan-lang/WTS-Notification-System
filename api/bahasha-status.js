@@ -21,6 +21,7 @@ async function authorize(body) {
     error.status = 401;
     throw error;
   }
+  return result;
 }
 
 async function readInternalTemplates(body) {
@@ -52,18 +53,31 @@ module.exports = async function handler(req, res) {
   }
   const body = readBody(req);
   try {
-    await authorize(body);
+    const internalStatus = await authorize(body);
     const current = config();
     const internalTemplates = await readInternalTemplates(body);
+    const delivery = internalStatus?.delivery || null;
+    const provider = internalStatus?.provider || null;
+    const liveReady = Boolean(
+      current.configured &&
+        current.environment === "production" &&
+        delivery?.delivery_enabled &&
+        !delivery?.dry_run &&
+        delivery?.active_provider_code === "meta_whatsapp_cloud" &&
+        String(provider?.status || "").toLowerCase() === "active",
+    );
     if (!current.configured) {
       return sendJson(res, 200, {
         ok: true,
         connected: false,
+        live_delivery_ready: false,
         environment: "unconfigured",
         approved_template_count: 0,
         templates: [],
         internal_templates: internalTemplates,
         template_mappings: current.templates,
+        delivery,
+        provider,
       });
     }
     if (body.action === "test") {
@@ -116,6 +130,7 @@ module.exports = async function handler(req, res) {
     return sendJson(res, 200, {
       ok: true,
       connected: Boolean(phone),
+      live_delivery_ready: liveReady && Boolean(phone),
       environment: current.environment,
       display_name: phone?.display_name || null,
       phone_number: phone?.phone_number || null,
@@ -124,6 +139,8 @@ module.exports = async function handler(req, res) {
       templates,
       internal_templates: internalTemplates,
       template_mappings: current.templates,
+      delivery,
+      provider,
       required_templates: Object.values(current.templates)
         .map((item) => item.name)
         .filter((name, index, all) => all.indexOf(name) === index),
