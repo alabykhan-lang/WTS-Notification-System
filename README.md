@@ -16,6 +16,11 @@ Guardian imports are performed one class at a time. The import validator matches
 
 The database intentionally keeps one child-level contact link per student. The parent directory and bulk sender group those links by the normalized WhatsApp destination. A class-scoped message includes only that class's child links; an all-school message includes all eligible child links on the destination. A group is eligible only when all links in the current scope are explicitly opted in (and, when configured, verified). This prevents duplicate sends without widening consent.
 
+The Send message screen has two recipient modes:
+
+- `By class` sends to all ready parents or selected parents in one class. Only that class's child links are included.
+- `By parent` loads the parent directory across all classes. Each parent appears once, and staff can tick one or more children—even children in different classes—for one merged WhatsApp message.
+
 The resulting message payload keeps `group_key`, `member_ids`, `student_ids`, `children` and `children_summary`, so delivery history can show which children were included in one parent message. A parent number is never sent once per child.
 
 ## Access
@@ -24,8 +29,8 @@ The module uses the unified Staff Portal PKCE handoff. There is no separate admi
 
 ## Bahasha delivery architecture
 
-1. Staff choose an approved Bahasha template, one active class and either all ready parents or selected parents.
-2. WTS creates one parent-only message record per normalized WhatsApp number in the shared Supabase database. Siblings in the selected class are stored together in that record.
+1. Staff choose an approved Bahasha template, then choose a class or a parent across classes.
+2. WTS creates one parent-only message record per normalized WhatsApp number in the shared Supabase database. Selected siblings are stored together in that record.
 3. `/api/bahasha-dispatch` claims queued records through the existing protected notification worker contract.
 4. The Vercel Function calls `POST https://api.bahasha.app/v1/whatsapp/send` with the selected approved template. The portal does not ask staff to type the template text again.
 5. `/api/bahasha-webhook` accepts Bahasha verification and delivery/reply events.
@@ -56,7 +61,7 @@ Use `bh_test_*` until template mapping and recipient selection are verified. A s
 
 ## Template alignment
 
-Bahasha is the delivery template catalogue and Meta approval authority. The Send message screen lists only templates returned by Bahasha with `APPROVED` status. Staff select the template by name; WTS sends that approved template and its automatic parent/child details. There is no second free-text message box. If a Bahasha template still requires a manual `message` variable, WTS blocks that template-only send instead of silently sending the template name as the message.
+Bahasha is the delivery template catalogue and Meta approval authority. The Send message screen lists templates returned by Bahasha with `APPROVED` status that can be filled from school records. Staff select the template by name; WTS sends that approved template and its automatic parent/child details. There is no second free-text message box. The saved Staff Portal values for the current term and resumption date are attached automatically. If a Bahasha template still requires a manual `message`, incident summary or secure link, WTS marks it as needing event details instead of silently sending the template name as the message.
 
 The portal has three working areas: `Home`, `Send message` and `Delivery reports`. Contact import and Bahasha contact sync are kept under `Send message` because they prepare contacts; they do not deliver messages.
 

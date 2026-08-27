@@ -7,14 +7,7 @@
   const $ = (selector) => document.querySelector(selector);
 
   function selectedParents() {
-    return [...state.selected]
-      .map((groupKey) => state.contacts.find((contact) => UI.keyOf(contact) === groupKey))
-      .filter(Boolean)
-      .map((contact) => ({
-        type: "guardian_group",
-        id: UI.keyOf(contact),
-        memberIds: Array.isArray(contact.member_ids) ? contact.member_ids : [],
-      }));
+    return UI.selectedRecipients();
   }
 
   function selectedContactIds(groups) {
@@ -105,16 +98,22 @@
     event.preventDefault();
     const button = $("#sendButton");
     const template = UI.selectedTemplate();
-    const classKey = $("#composeClass")?.value || "";
-    const audience = $("input[name=audience]:checked")?.value || "all";
-    const selected = audience === "selected" ? selectedParents() : [];
-    const ready = state.contacts.filter((contact) => contact.eligible === true || contact.eligible === 1 || contact.eligible === "true");
-    const count = audience === "selected" ? selected.length : ready.length;
+    const mode = UI.recipientMode();
+    const classKey = UI.currentClassKey();
+    const audience = mode === "parent" ? "selected" : $("input[name=audience]:checked")?.value || "all";
+    const selected = audience === "selected" || mode === "parent" ? selectedParents() : [];
+    const ready = mode === "class"
+      ? state.contacts.filter((contact) => contact.eligible === true || contact.eligible === 1 || contact.eligible === "true")
+      : selected;
+    const count = audience === "selected" || mode === "parent" ? selected.length : ready.length;
     if (!template?.name) return UI.toast("Choose an approved Bahasha template first.", "error");
-    if (!classKey) return UI.toast("Choose a class first.", "error");
-    if (!count) return UI.toast("There are no ready parent contacts to send to.", "error");
-    const scope = UI.classNameFor(classKey);
-    if (!confirm(`Send "${template.name}" to ${count} parent${count === 1 ? "" : "s"} in ${scope}?`)) return;
+    if (mode === "class" && !classKey) return UI.toast("Choose a class first.", "error");
+    if (UI.templateDirectIssue(template)) return UI.toast(UI.templateDirectIssue(template), "error");
+    if (!count) return UI.toast(mode === "parent" ? "Select a parent and at least one ready child." : "There are no ready parent contacts to send to.", "error");
+    const scope = mode === "parent" ? "the selected children" : UI.classNameFor(classKey);
+    const childCount = mode === "parent" ? UI.selectedChildCount() : "";
+    const detail = childCount ? ` (${childCount} child${childCount === 1 ? "" : "ren"})` : "";
+    if (!confirm(`Send "${template.name}" to ${count} parent${count === 1 ? "" : "s"}${detail} in ${scope}?`)) return;
     if (button) {
       button.disabled = true;
       button.textContent = "Sending…";
@@ -128,13 +127,15 @@
         whatsappTemplateLanguage: template.language || template.language_code || "en_US",
         selectedRecipients: selected,
         contactIds: selectedContactIds(selected),
+        templateVariables: {},
       });
       let dispatch = null;
       if (result.queued) dispatch = await gatewayRequest("/api/bahasha-dispatch", "dispatch", { limit: result.queued });
       const outcomes = outcomeSummary(dispatch);
       const remaining = Math.max(0, Number(result.queued || 0) - outcomes.processed);
       $("#bulkResult").hidden = false;
-      $("#bulkResult").innerHTML = `<strong>Message sent</strong><br>Template: ${UI.escapeHtml(template.name)}<br>Parent groups: ${UI.escapeHtml(result.created || count)}<br>Sent now: ${UI.escapeHtml(outcomes.sent)}${outcomes.failed ? `<br>Failed: ${UI.escapeHtml(outcomes.failed)}` : ""}${remaining ? `<br>Still queued: ${UI.escapeHtml(remaining)}` : ""}`;
+      const headline = outcomes.failed ? "Some messages need attention" : outcomes.sent ? "Message sent to Bahasha" : "Message queued for delivery";
+      $("#bulkResult").innerHTML = `<strong>${headline}</strong><br>Template: ${UI.escapeHtml(template.name)}<br>Parent groups: ${UI.escapeHtml(result.created || count)}<br>Sent now: ${UI.escapeHtml(outcomes.sent)}${outcomes.failed ? `<br>Failed: ${UI.escapeHtml(outcomes.failed)}` : ""}${remaining ? `<br>Still queued: ${UI.escapeHtml(remaining)}` : ""}`;
       UI.toast(outcomes.sent ? `${outcomes.sent} parent message(s) sent.` : "Message queued for delivery.", outcomes.failed ? "error" : "success");
       await Promise.all([UI.loadSummary(), UI.loadMessages()]);
     } catch (error) {

@@ -44,14 +44,14 @@
           </div>
         </header>
 
-        <div class="notice"><b>Parents only.</b> Staff and teachers are not notification recipients. Import saves parent numbers in WTS. Sync copies eligible contacts to Bahasha. Sending happens only when you click Send message.</div>
+        <div class="notice"><b>Parents only.</b> Choose an approved template, choose a class or parent, then send. WTS groups the same WhatsApp number into one message. Import saves contacts in WTS; syncing copies eligible contacts to Bahasha and does not send a message.</div>
 
         <section class="view active" id="view-overview">
           <section class="welcome card">
             <div>
               <span class="eyebrow">NOTIFICATION CENTRE</span>
               <h2>What would you like to do?</h2>
-              <p>Choose an approved message, select a class and send it to the parents you want.</p>
+              <p>Choose an approved message, choose a class or parent, and send it to the people you want.</p>
             </div>
             <button class="primary large-button" data-go="compose" type="button">Send a message</button>
           </section>
@@ -65,7 +65,7 @@
           <div class="home-grid">
             <article class="card home-action">
               <span class="eyebrow">QUICK ACTIONS</span>
-              <button class="quick-button" data-go="compose" type="button"><b>Send a message</b><small>Choose a template and class</small><em>→</em></button>
+              <button class="quick-button" data-go="compose" type="button"><b>Send a message</b><small>Choose a template and recipients</small><em>→</em></button>
               <button class="quick-button" data-go="delivery" type="button"><b>View delivery reports</b><small>See sent, delivered or failed messages</small><em>→</em></button>
             </article>
             <article class="card provider-card">
@@ -93,20 +93,37 @@
 
               <div class="send-step">
                 <span class="step-number">2</span>
-                <div class="step-content"><label>Choose the class<select id="composeClass" required><option value="">Choose a class</option></select></label></div>
+                <div class="step-content">
+                  <label>How do you want to choose parents?</label>
+                  <div class="choice-list">
+                    <label class="choice"><input type="radio" name="recipientMode" value="class" checked /> <span><b>By class</b><small>Send one bulk message to ready parents in one class.</small></span></label>
+                    <label class="choice"><input type="radio" name="recipientMode" value="parent" /> <span><b>By parent</b><small>Find a parent across all classes and choose one or more children.</small></span></label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="send-step" id="classRecipientStep">
+                <span class="step-number">3</span>
+                <div class="step-content"><label>Choose the class<select id="composeClass"><option value="">Choose a class</option></select></label></div>
               </div>
 
               <div class="send-step">
-                <span class="step-number">3</span>
+                <span class="step-number">4</span>
                 <div class="step-content">
                   <label>Who should receive the message?</label>
-                  <div class="choice-list">
+                  <div class="choice-list" id="classAudienceChoices">
                     <label class="choice"><input type="radio" name="audience" value="all" checked /> <span><b>All ready parents in this class</b><small id="allCount">0 parents</small></span></label>
                     <label class="choice"><input type="radio" name="audience" value="selected" /> <span><b>Only the parents I select</b><small id="selectedCount">0 selected</small></span></label>
                   </div>
                   <div class="recipient-picker" id="sendContacts" hidden>
                     <div class="picker-head"><b>Select parents</b><button class="text-button" id="selectAllSend" type="button">Select all ready</button></div>
                     <div id="sendContactRows" class="send-contact-list"><div class="empty-inline">Choose a class first.</div></div>
+                  </div>
+                  <div class="recipient-picker" id="parentContacts" hidden>
+                    <div class="picker-head"><b>Select parents and children</b><button class="text-button" id="selectAllParents" type="button">Select all ready</button></div>
+                    <label class="picker-search">Find a parent or child<input id="parentSearch" type="search" placeholder="Type a name or class" autocomplete="off" /></label>
+                    <p class="picker-hint">Each parent appears once. Tick the children to include in the same WhatsApp message.</p>
+                    <div id="parentContactRows" class="send-contact-list"><div class="empty-inline">Loading parents…</div></div>
                   </div>
                 </div>
               </div>
@@ -123,8 +140,9 @@
               <h2>Simple and safe</h2>
               <ul class="simple-list">
                 <li>One WhatsApp message per parent number</li>
-                <li>Siblings are merged into that one message</li>
-                <li>Only the selected class is included</li>
+                <li>Siblings can be merged into that one message</li>
+                <li>Use By class for a class-only notice</li>
+                <li>Use By parent for children across classes</li>
                 <li>Only opted-in parents can receive it</li>
               </ul>
               <div class="provider-line"><i id="composeProviderDot"></i><span id="composeProviderText">Checking Bahasha…</span></div>

@@ -12,6 +12,7 @@ test("the portal exposes a simple template, class and recipient workflow", async
   const app = await read("app.js");
   const bulk = await read("bulk.js");
   const migration = await read("supabase/migrations/20260827080000_template_driven_notifications.sql");
+  const multiClassMigration = await read("supabase/migrations/20260827123000_multi_class_parent_template_send.sql");
   assert.match(html, /Home/);
   assert.match(html, /Send message/);
   assert.match(html, /Delivery reports/);
@@ -19,17 +20,24 @@ test("the portal exposes a simple template, class and recipient workflow", async
   assert.match(html, /Choose the class/);
   assert.match(html, /All ready parents in this class/);
   assert.match(html, /Only the parents I select/);
+  assert.match(html, /By parent/);
+  assert.match(html, /Select parents and children/);
+  assert.match(html, /Each parent appears once/);
   assert.match(html, /Import or update class contacts/);
   assert.doesNotMatch(html, /Message details/);
   assert.doesNotMatch(html, /Prepare parent messages/);
   assert.match(app, /recipientRead\("recipients"/);
   assert.match(app, /guardianImportWrite\("validateBatch"/);
-  assert.match(bulk, /type: "guardian_group"/);
+  assert.match(app, /type: "guardian_group"/);
+  assert.match(bulk, /selectedRecipients/);
   assert.match(bulk, /templateSend/);
   assert.match(app, /messageWrite\("deleteDrafts"/);
   assert.match(migration, /template_only/);
   assert.match(migration, /CLASS_REQUIRED/);
   assert.match(migration, /deleteDrafts/);
+  assert.match(multiClassMigration, /v_class_key is null or s\.class_key = v_class_key/);
+  assert.match(multiClassMigration, /next_term_resumption/);
+  assert.match(multiClassMigration, /template_variables/);
 });
 
 test("template-only delivery never turns the template name into custom message text", () => {
@@ -143,6 +151,41 @@ test("template-only delivery maps ward lists to the merged children automaticall
     message.variables.body.ward_list,
     "Student One (Primary 3), Student Two (Primary 3)",
   );
+  if (previous.token === undefined) delete process.env.BAHASHA_API_TOKEN;
+  else process.env.BAHASHA_API_TOKEN = previous.token;
+  if (previous.phone === undefined) delete process.env.BAHASHA_PHONE_NUMBER_ID;
+  else process.env.BAHASHA_PHONE_NUMBER_ID = previous.phone;
+});
+
+test("template-only delivery formats the saved resumption date", () => {
+  const previous = {
+    token: process.env.BAHASHA_API_TOKEN,
+    phone: process.env.BAHASHA_PHONE_NUMBER_ID,
+  };
+  process.env.BAHASHA_API_TOKEN = "bh_test_resumption_date";
+  process.env.BAHASHA_PHONE_NUMBER_ID = "test-phone-id";
+  const helper = require("../api/_bahasha.js");
+  const message = helper.templateFor(
+    {
+      recipient_name: "Parent Group",
+      message: "wts_resumption_notice",
+      payload: {
+        template_only: true,
+        whatsapp_template_name: "wts_resumption_notice",
+        children_summary: "Student One (Primary 3)",
+        template_variables: { resumption_date: "2026-09-14" },
+      },
+    },
+    [
+      {
+        name: "wts_resumption_notice",
+        language: "en_US",
+        status: "APPROVED",
+        expected_variables: { body: [{ param_name: "resumption_date" }] },
+      },
+    ],
+  );
+  assert.equal(message.variables.body.resumption_date, "14 September 2026");
   if (previous.token === undefined) delete process.env.BAHASHA_API_TOKEN;
   else process.env.BAHASHA_API_TOKEN = previous.token;
   if (previous.phone === undefined) delete process.env.BAHASHA_PHONE_NUMBER_ID;

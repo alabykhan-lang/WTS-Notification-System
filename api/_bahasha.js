@@ -165,8 +165,22 @@ function mergedMessage(message) {
   return `${base}\n\nChildren in this message: ${children}`;
 }
 
+function displayDate(value) {
+  const raw = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const date = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return raw;
+  return new Intl.DateTimeFormat("en-NG", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Africa/Lagos",
+  }).format(date);
+}
+
 function messageValue(message, key) {
   const payload = message.payload || {};
+  const templateVariables = payload.template_variables || payload.templateVariables || {};
   const children = childrenSummary(message);
   const childList =
     children || payload.student_name || message.associated_name || "your child";
@@ -192,6 +206,14 @@ function messageValue(message, key) {
     class_list: className,
     school: schoolName,
     school_name: schoolName,
+    resumption_date: displayDate(
+      templateVariables.resumption_date ||
+        payload.resumption_date ||
+        payload.next_term_resumption ||
+        payload.session_resumption_date,
+    ),
+    term: templateVariables.term || payload.term || "",
+    academic_session: templateVariables.academic_session || payload.academic_session || "",
     date: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeZone: "Africa/Lagos" }).format(new Date()),
     time: new Intl.DateTimeFormat("en-NG", { timeStyle: "short", timeZone: "Africa/Lagos" }).format(new Date()),
     message: payload.template_only ? String(payload.custom_message || "") : mergedMessage(message),
@@ -210,7 +232,6 @@ function variablesFor(template, message, purpose) {
     "message",
     "correction_summary",
     "secure_link",
-    "term",
     "late_minutes",
     "cutoff_time",
   ]);

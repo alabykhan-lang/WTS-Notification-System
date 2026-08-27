@@ -49,7 +49,7 @@ test("the product targets parents and does not offer staff recipients", async ()
     html,
     /<option[^>]*value="staff"|Parents and staff|Staff only/,
   );
-  assert.match(html, /Staff and teachers are not notification\s+recipients/);
+  assert.match(html, /Import saves contacts in WTS/);
   assert.match(app, /recipientType: "guardian"/);
   assert.match(bulk, /recipientGroup: "guardian"/);
   assert.doesNotMatch(bulk, /recipientGroup: \$\(/);

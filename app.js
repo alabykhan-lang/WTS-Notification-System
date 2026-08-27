@@ -12,6 +12,9 @@
     remoteTemplates: [],
     provider: null,
     selected: new Set(),
+    selectedChildren: new Map(),
+    recipientMode: "class",
+    recipientsLoading: false,
     connected: false,
     importBatchId: null,
     importRows: [],
@@ -24,10 +27,39 @@
     BAHASHA_LIVE_PROVIDER_NOT_READY: "Bahasha is not ready for live delivery yet.",
     CLASS_REQUIRED: "Choose a class first.",
     INVALID_CLASS: "That class is no longer active. Refresh and choose another class.",
-    NO_ELIGIBLE_PARENT_GROUPS: "There are no opted-in parent contacts ready in this class.",
+    NO_ELIGIBLE_PARENT_GROUPS: "There are no opted-in parent contacts ready for this selection.",
     SELECTED_RECIPIENTS_REQUIRED: "Select at least one ready parent.",
+    TEMPLATE_VARIABLE_INPUT_REQUIRED: "This approved template needs information that is not available for a one-click message.",
     WHATSAPP_CHANNEL_NOT_ALLOWED: "WhatsApp is not enabled for this school.",
   };
+
+  const directTemplateVariables = new Set([
+    "parent_name",
+    "guardian_name",
+    "student_name",
+    "student_list",
+    "student_names",
+    "children",
+    "children_summary",
+    "children_list",
+    "ward_list",
+    "ward_name",
+    "ward_names",
+    "wards",
+    "child_count",
+    "class_name",
+    "class",
+    "class_list",
+    "school",
+    "school_name",
+    "date",
+    "time",
+    "resumption_date",
+    "term",
+    "academic_session",
+  ]);
+
+  const positionalTemplateVariables = ["parent_name", "message"];
 
   const escapeHtml = (value) =>
     String(value ?? "").replace(
@@ -101,6 +133,77 @@
     return contact?.eligible === true || contact?.eligible === 1 || contact?.eligible === "true";
   }
 
+  function recipientMode() {
+    return document.querySelector("input[name=recipientMode]:checked")?.value || state.recipientMode || "class";
+  }
+
+  function currentClassKey() {
+    return recipientMode() === "parent" ? "all" : $("#composeClass")?.value || "";
+  }
+
+  function templateVariableNames(template) {
+    return (template?.expected_variables?.body || [])
+      .map((item, index) => {
+        const parameterName = String(item?.param_name ?? "");
+        return /^\d+$/.test(parameterName) ? positionalTemplateVariables[index] || parameterName : parameterName;
+      })
+      .filter(Boolean);
+  }
+
+  function templateDirectIssue(template) {
+    const unsupported = templateVariableNames(template).filter((key) => !directTemplateVariables.has(key));
+    return unsupported.length ? `This template needs ${unsupported.join(", ")}. Choose a template prepared for one-click sending.` : "";
+  }
+
+  function isChildReady(child, contact) {
+    const consent = String(child?.consent_status || child?.consentStatus || "").toLowerCase();
+    return Boolean(
+      child?.contact_id &&
+      contact?.whatsapp_number &&
+      (child?.eligible === true || child?.eligible === 1 || child?.eligible === "true" || consent === "opted_in"),
+    );
+  }
+
+  function readyChildrenOf(contact) {
+    return childrenOf(contact).filter((child) => isChildReady(child, contact));
+  }
+
+  function selectedChildIds(contact) {
+    const key = keyOf(contact);
+    if (recipientMode() === "class") {
+      return new Set((state.selected.has(key) ? contact.member_ids || [] : []).map((id) => String(id)));
+    }
+    return new Set([...(state.selectedChildren.get(key) || [])].map((id) => String(id)));
+  }
+
+  function selectedRecipients() {
+    if (recipientMode() === "class") {
+      return [...state.selected]
+        .map((groupKey) => state.contacts.find((contact) => keyOf(contact) === groupKey))
+        .filter(Boolean)
+        .map((contact) => ({
+          type: "guardian_group",
+          id: keyOf(contact),
+          memberIds: Array.isArray(contact.member_ids) ? contact.member_ids : [],
+        }));
+    }
+    return state.contacts
+      .map((contact) => ({
+        type: "guardian_group",
+        id: keyOf(contact),
+        memberIds: [...selectedChildIds(contact)],
+      }))
+      .filter((group) => group.memberIds.length > 0);
+  }
+
+  function selectedRecipientCount() {
+    return selectedRecipients().length;
+  }
+
+  function selectedChildCount() {
+    return selectedRecipients().reduce((total, group) => total + group.memberIds.length, 0);
+  }
+
   function setConnected(connected, message = "") {
     state.connected = connected;
     document.body.classList.toggle("locked", !connected);
@@ -118,6 +221,7 @@
     state.contacts = [];
     state.messages = [];
     state.selected.clear();
+    state.selectedChildren.clear();
     setConnected(false);
     window.location.assign(`${window.WTS_CONFIG.portalOrigin}/workspace`);
   }
@@ -164,7 +268,8 @@
       void window.WTS_NOTIFY_PROVIDER.loadStatus({ silent: true });
     }
     if ($("#view-compose")?.classList.contains("active")) {
-      await loadClassRecipients($("#composeClass")?.value || "");
+      if (recipientMode() === "parent") await loadParentRecipients();
+      else await loadClassRecipients($("#composeClass")?.value || "");
     }
     if ($("#view-delivery")?.classList.contains("active")) {
       await loadMessages();
@@ -173,13 +278,18 @@
   }
 
   async function loadClassRecipients(classKey, { resetSelection = false } = {}) {
-    if (resetSelection) state.selected.clear();
+    if (resetSelection) {
+      state.selected.clear();
+      state.selectedChildren.clear();
+    }
     if (!classKey) {
       state.contacts = [];
       renderSendRecipients();
       renderSendState();
       return [];
     }
+    state.recipientsLoading = true;
+    renderSendRecipients();
     try {
       const data = await API.recipientRead("recipients", {
         recipientType: "guardian",
@@ -199,6 +309,43 @@
     } catch (error) {
       toast(friendlyError(error), "error");
       return [];
+    } finally {
+      state.recipientsLoading = false;
+      renderSendRecipients();
+      renderSendState();
+    }
+  }
+
+  async function loadParentRecipients({ resetSelection = false } = {}) {
+    if (resetSelection) {
+      state.selected.clear();
+      state.selectedChildren.clear();
+    }
+    state.recipientsLoading = true;
+    renderSendRecipients();
+    try {
+      const data = await API.recipientRead("recipients", {
+        recipientType: "guardian",
+        status: "",
+        classKey: "all",
+        pilotOnly: false,
+        limit: 2000,
+      });
+      state.contacts = (data.recipients || []).filter(
+        (contact) => contact.recipient_type !== "staff",
+      );
+      const currentKeys = new Set(state.contacts.map(keyOf));
+      state.selectedChildren = new Map(
+        [...state.selectedChildren].filter(([key]) => currentKeys.has(key)),
+      );
+      return state.contacts;
+    } catch (error) {
+      toast(friendlyError(error), "error");
+      return [];
+    } finally {
+      state.recipientsLoading = false;
+      renderSendRecipients();
+      renderSendState();
     }
   }
 
@@ -218,67 +365,169 @@
   }
 
   function renderSendRecipients() {
-    const rows = $("#sendContactRows");
-    if (!rows) return;
-    if (!$("#composeClass")?.value) {
-      rows.innerHTML = '<div class="empty-inline">Choose a class first.</div>';
+    const mode = recipientMode();
+    const classRows = $("#sendContactRows");
+    const parentRows = $("#parentContactRows");
+    if (!classRows || !parentRows) return;
+
+    if (mode === "class") {
+      if (!$("#composeClass")?.value) {
+        classRows.innerHTML = '<div class="empty-inline">Choose a class first.</div>';
+        return;
+      }
+      if (state.recipientsLoading) {
+        classRows.innerHTML = '<div class="empty-inline">Loading parents…</div>';
+        return;
+      }
+      if (!state.contacts.length) {
+        classRows.innerHTML = '<div class="empty-inline">No parent contacts found in this class.</div>';
+        return;
+      }
+      classRows.innerHTML = state.contacts
+        .map((contact) => {
+          const key = keyOf(contact);
+          const ready = isReady(contact);
+          const children = childrenText(contact) || "No child link shown";
+          const reason = ready
+            ? "Ready"
+            : contact.whatsapp_number
+              ? "Needs opt-in or verification"
+              : "WhatsApp number missing";
+          return `<label class="send-contact ${ready ? "" : "not-ready"}">
+            <input type="checkbox" data-send-contact="${escapeHtml(key)}" ${state.selected.has(key) ? "checked" : ""} ${ready ? "" : "disabled"} />
+            <span><b>${escapeHtml(contact.display_name || "Parent")}</b><small>${escapeHtml(children)}</small><small>${escapeHtml(contact.whatsapp_number || "No WhatsApp number")}</small></span>
+            <span class="badge ${ready ? "ready" : ""}">${escapeHtml(reason)}</span>
+          </label>`;
+        })
+        .join("");
+
+      $$('[data-send-contact]').forEach((checkbox) => {
+        checkbox.onchange = () => {
+          if (checkbox.checked) state.selected.add(checkbox.dataset.sendContact);
+          else state.selected.delete(checkbox.dataset.sendContact);
+          renderSendState();
+        };
+      });
+      return;
+    }
+
+    if (state.recipientsLoading) {
+      parentRows.innerHTML = '<div class="empty-inline">Loading all parent contacts…</div>';
       return;
     }
     if (!state.contacts.length) {
-      rows.innerHTML = '<div class="empty-inline">No parent contacts found in this class.</div>';
+      parentRows.innerHTML = '<div class="empty-inline">No parent contacts found.</div>';
       return;
     }
-    rows.innerHTML = state.contacts
+    const query = String($("#parentSearch")?.value || "").trim().toLowerCase();
+    const contacts = state.contacts.filter((contact) => {
+      if (!query) return true;
+      return `${contact.display_name || ""} ${contact.whatsapp_number || ""} ${childrenText(contact)}`.toLowerCase().includes(query);
+    });
+    if (!contacts.length) {
+      parentRows.innerHTML = '<div class="empty-inline">No parent or child matches that search.</div>';
+      return;
+    }
+    parentRows.innerHTML = contacts
       .map((contact) => {
         const key = keyOf(contact);
-        const ready = isReady(contact);
-        const children = childrenText(contact) || "No child link shown";
-        const reason = ready
-          ? "Ready"
+        const children = childrenOf(contact);
+        const readyChildren = readyChildrenOf(contact);
+        const selected = selectedChildIds(contact);
+        const allReadySelected = readyChildren.length > 0 && readyChildren.every((child) => selected.has(String(child.contact_id)));
+        const parentReason = readyChildren.length
+          ? `${readyChildren.length} ready child${readyChildren.length === 1 ? "" : "ren"}`
           : contact.whatsapp_number
-            ? "Needs opt-in or verification"
+            ? "Needs opt-in"
             : "WhatsApp number missing";
-        return `<label class="send-contact ${ready ? "" : "not-ready"}">
-          <input type="checkbox" data-send-contact="${escapeHtml(key)}" ${state.selected.has(key) ? "checked" : ""} ${ready ? "" : "disabled"} />
-          <span><b>${escapeHtml(contact.display_name || "Parent")}</b><small>${escapeHtml(children)}</small><small>${escapeHtml(contact.whatsapp_number || "No WhatsApp number")}</small></span>
-          <span class="badge ${ready ? "ready" : ""}">${escapeHtml(reason)}</span>
-        </label>`;
+        return `<div class="send-contact parent-contact ${readyChildren.length ? "" : "not-ready"}">
+          <label class="send-contact-main">
+            <input type="checkbox" data-send-parent="${escapeHtml(key)}" ${allReadySelected ? "checked" : ""} ${readyChildren.length ? "" : "disabled"} />
+            <span><b>${escapeHtml(contact.display_name || "Parent")}</b><small>${escapeHtml(contact.whatsapp_number || "No WhatsApp number")}</small><small>${escapeHtml(parentReason)}</small></span>
+            <span class="badge ${readyChildren.length ? "ready" : ""}">${readyChildren.length ? "Ready" : "Not ready"}</span>
+          </label>
+          <div class="send-child-list">
+            ${children.length ? children.map((child) => {
+              const childReady = isChildReady(child, contact);
+              const childId = String(child.contact_id || "");
+              const childLabel = `${child.name || "Student"}${child.class_name ? ` · ${child.class_name}` : ""}`;
+              const childReason = childReady ? "Ready" : "Needs WhatsApp consent";
+              return `<label class="send-child ${childReady ? "" : "not-ready"}"><input type="checkbox" data-send-child="${escapeHtml(key)}" data-child-id="${escapeHtml(childId)}" ${selected.has(childId) ? "checked" : ""} ${childReady ? "" : "disabled"} /><span>${escapeHtml(childLabel)}</span><small>${escapeHtml(childReason)}</small></label>`;
+            }).join("") : '<small class="empty-inline">No linked children shown.</small>'}
+          </div>
+        </div>`;
       })
       .join("");
 
-    $$('[data-send-contact]').forEach((checkbox) => {
+    $$('[data-send-parent]').forEach((checkbox) => {
       checkbox.onchange = () => {
-        if (checkbox.checked) state.selected.add(checkbox.dataset.sendContact);
-        else state.selected.delete(checkbox.dataset.sendContact);
+        const contact = state.contacts.find((item) => keyOf(item) === checkbox.dataset.sendParent);
+        if (!contact) return;
+        if (checkbox.checked) state.selectedChildren.set(keyOf(contact), new Set(readyChildrenOf(contact).map((child) => String(child.contact_id))));
+        else state.selectedChildren.delete(keyOf(contact));
+        renderSendRecipients();
+        renderSendState();
+      };
+    });
+    $$('[data-send-child]').forEach((checkbox) => {
+      checkbox.onchange = () => {
+        const key = checkbox.dataset.sendChild;
+        const selected = new Set(state.selectedChildren.get(key) || []);
+        if (checkbox.checked) selected.add(String(checkbox.dataset.childId));
+        else selected.delete(String(checkbox.dataset.childId));
+        if (selected.size) state.selectedChildren.set(key, selected);
+        else state.selectedChildren.delete(key);
+        renderSendRecipients();
         renderSendState();
       };
     });
   }
 
   function renderSendState() {
-    const ready = state.contacts.filter(isReady);
-    const selectedReady = ready.filter((contact) => state.selected.has(keyOf(contact)));
-    const audience = $("input[name=audience]:checked")?.value || "all";
+    const mode = recipientMode();
+    const ready = mode === "class"
+      ? state.contacts.filter(isReady)
+      : state.contacts.filter((contact) => readyChildrenOf(contact).length > 0);
+    const selectedReady = mode === "class"
+      ? ready.filter((contact) => state.selected.has(keyOf(contact)))
+      : state.contacts.filter((contact) => selectedChildIds(contact).size > 0);
+    const audience = mode === "parent" ? "selected" : $("input[name=audience]:checked")?.value || "all";
     const template = selectedTemplate();
-    const classKey = $("#composeClass")?.value || "";
+    const classKey = currentClassKey();
     const count = audience === "selected" ? selectedReady.length : ready.length;
+    const childCount = mode === "parent"
+      ? selectedChildCount()
+      : audience === "selected"
+        ? selectedReady.reduce((total, contact) => total + (Array.isArray(contact.member_ids) ? contact.member_ids.length : 0), 0)
+        : ready.reduce((total, contact) => total + (Array.isArray(contact.member_ids) ? contact.member_ids.length : 0), 0);
+    const templateIssue = templateDirectIssue(template);
     if ($("#allCount")) $("#allCount").textContent = `${ready.length} parent${ready.length === 1 ? "" : "s"}`;
     if ($("#selectedCount")) $("#selectedCount").textContent = `${selectedReady.length} selected`;
-    if ($("#sendContacts")) $("#sendContacts").hidden = audience !== "selected";
+    if ($("#classRecipientStep")) $("#classRecipientStep").hidden = mode === "parent";
+    if ($("#classAudienceChoices")) $("#classAudienceChoices").hidden = mode === "parent";
+    if ($("#sendContacts")) $("#sendContacts").hidden = mode !== "class" || audience !== "selected";
+    if ($("#parentContacts")) $("#parentContacts").hidden = mode !== "parent";
     if ($("#selectAllSend")) $("#selectAllSend").disabled = !ready.length;
+    if ($("#selectAllParents")) $("#selectAllParents").disabled = !ready.length;
 
-    let review = "Choose a template and class to continue.";
-    if (template && classKey) {
+    let review = "Choose an approved message to continue.";
+    if (templateIssue) {
+      review = templateIssue;
+    } else if (template && mode === "class" && !classKey) {
+      review = "Choose a class to see its ready parent contacts.";
+    } else if (template && mode === "class") {
       review = audience === "selected"
         ? `${selectedReady.length} ready parent${selectedReady.length === 1 ? "" : "s"} selected in ${classNameFor(classKey)}.`
         : `${ready.length} ready parent${ready.length === 1 ? "" : "s"} in ${classNameFor(classKey)}.`;
       if (!count) review = `No ready parent contacts are available in ${classNameFor(classKey)}.`;
-    } else if (template) {
-      review = "Choose a class to see its ready parent contacts.";
+    } else if (template && mode === "parent") {
+      review = count
+        ? `${count} parent${count === 1 ? "" : "s"} selected · ${childCount} child${childCount === 1 ? "" : "ren"} will be included.`
+        : "Select a parent and at least one ready child.";
     }
     if ($("#sendReview")) $("#sendReview").textContent = review;
     const deliveryReady = state.provider?.live_delivery_ready === true;
-    const canSend = Boolean(template && classKey && count && deliveryReady);
+    const canSend = Boolean(template && !templateIssue && (mode === "parent" || classKey) && count && deliveryReady);
     if ($("#sendButton")) $("#sendButton").disabled = !canSend;
   }
 
@@ -303,12 +552,11 @@
       return;
     }
     const text = templateBody(template);
-    const variables = (template.expected_variables?.body || [])
-      .map((item) => item.param_name)
-      .filter((item) => item !== undefined && item !== null);
+    const variables = templateVariableNames(template);
+    const issue = templateDirectIssue(template);
     preview.innerHTML = text
-      ? `<strong>Approved message</strong><br>${escapeHtml(text)}${variables.length ? `<br><small>Automatic details: ${escapeHtml(variables.join(", "))}</small>` : ""}`
-      : `<strong>${escapeHtml(template.name)}</strong><br>Bahasha will use the approved message text.${variables.length ? `<br><small>Automatic details: ${escapeHtml(variables.join(", "))}</small>` : ""}`;
+      ? `<strong>Approved message</strong><br>${escapeHtml(text)}${variables.length ? `<br><small>Filled automatically: ${escapeHtml(variables.join(", "))}</small>` : ""}${issue ? `<br><span class="template-warning">${escapeHtml(issue)}</span>` : ""}`
+      : `<strong>${escapeHtml(template.name)}</strong><br>Bahasha will use the approved message text.${variables.length ? `<br><small>Filled automatically: ${escapeHtml(variables.join(", "))}</small>` : ""}${issue ? `<br><span class="template-warning">${escapeHtml(issue)}</span>` : ""}`;
     renderSendState();
   }
 
@@ -319,17 +567,27 @@
     const approved = (state.remoteTemplates || []).filter(
       (item) => String(item.status || "").toUpperCase() === "APPROVED",
     );
-    select.innerHTML = [
-      '<option value="">Choose an approved message</option>',
-      ...approved.map((template) => {
+    const direct = approved.filter((template) => !templateDirectIssue(template));
+    const needsSetup = approved.filter((template) => templateDirectIssue(template));
+    const options = ['<option value="">Choose an approved message</option>'];
+    if (direct.length) {
+      options.push('<optgroup label="Ready for one-click sending">');
+      options.push(...direct.map((template) => {
         const language = template.language || template.language_code || "en_US";
         const value = `${encodeURIComponent(template.name)}::${encodeURIComponent(language)}`;
         return `<option value="${escapeHtml(value)}">${escapeHtml(template.name)} · ${escapeHtml(language)}</option>`;
-      }),
-    ].join("");
+      }));
+      options.push("</optgroup>");
+    }
+    if (needsSetup.length) {
+      options.push('<optgroup label="Approved but needs event details">');
+      options.push(...needsSetup.map((template) => `<option disabled>${escapeHtml(template.name)} · complete template setup first</option>`));
+      options.push("</optgroup>");
+    }
+    select.innerHTML = options.join("");
     if ([...select.options].some((option) => option.value === current)) select.value = current;
-    else if (approved.length === 1) {
-      const only = approved[0];
+    else if (direct.length === 1) {
+      const only = direct[0];
       select.value = `${encodeURIComponent(only.name)}::${encodeURIComponent(only.language || only.language_code || "en_US")}`;
     }
     renderTemplatePreview();
@@ -560,14 +818,15 @@
     const title = { overview: "Home", compose: "Send message", delivery: "Delivery reports" }[name] || "Home";
     const subtitle = {
       overview: "Send approved WhatsApp messages to parents.",
-      compose: "Choose a template, choose a class, choose the parents.",
+      compose: "Choose a template, then choose a class or parent.",
       delivery: "See sent, delivered, failed and draft messages.",
     }[name] || "Send approved WhatsApp messages to parents.";
     $("#title").textContent = title;
     $("#subtitle").textContent = subtitle;
     if (name === "compose") {
       renderSendRecipients();
-      if ($("#composeClass")?.value) void loadClassRecipients($("#composeClass").value);
+      if (recipientMode() === "parent") void loadParentRecipients();
+      else if ($("#composeClass")?.value) void loadClassRecipients($("#composeClass").value);
       renderSendState();
     }
     if (name === "delivery") void loadMessages();
@@ -578,14 +837,35 @@
   $("#templateSelect").onchange = renderTemplatePreview;
   $("#composeClass").onchange = () => {
     state.selected.clear();
+    state.selectedChildren.clear();
     void loadClassRecipients($("#composeClass").value, { resetSelection: true });
   };
+  $$('input[name="recipientMode"]').forEach((input) => {
+    input.onchange = () => {
+      state.recipientMode = input.value;
+      state.selected.clear();
+      state.selectedChildren.clear();
+      if (state.recipientMode === "parent") void loadParentRecipients({ resetSelection: true });
+      else void loadClassRecipients($("#composeClass")?.value || "", { resetSelection: true });
+      renderSendRecipients();
+      renderSendState();
+    };
+  });
   $$('input[name="audience"]').forEach((input) => { input.onchange = renderSendState; });
   $("#selectAllSend").onclick = () => {
     state.contacts.filter(isReady).forEach((contact) => state.selected.add(keyOf(contact)));
     renderSendRecipients();
     renderSendState();
   };
+  $("#selectAllParents").onclick = () => {
+    state.contacts.forEach((contact) => {
+      const readyChildren = readyChildrenOf(contact);
+      if (readyChildren.length) state.selectedChildren.set(keyOf(contact), new Set(readyChildren.map((child) => String(child.contact_id))));
+    });
+    renderSendRecipients();
+    renderSendState();
+  };
+  $("#parentSearch").oninput = renderSendRecipients;
   $("#validateImport").onclick = validateImport;
   $("#applyImport").onclick = applyImport;
   $("#downloadImportTemplate").onclick = downloadImportTemplate;
@@ -626,9 +906,15 @@
     classNameFor,
     childrenOf,
     keyOf,
+    recipientMode,
+    currentClassKey,
+    selectedRecipients,
+    selectedRecipientCount,
+    selectedChildCount,
+    templateDirectIssue,
     loadSummary,
     loadClasses,
-    loadContacts: () => loadClassRecipients($("#composeClass")?.value || ""),
+    loadContacts: () => recipientMode() === "parent" ? loadParentRecipients() : loadClassRecipients($("#composeClass")?.value || ""),
     loadMessages,
     renderTemplateSelect,
     renderTemplatePreview,
